@@ -114,7 +114,6 @@
             box-shadow: 0 5px 12px rgba(0,0,0,0.05);
             border: 1px solid #ffddb0;
         }
-        /* 生字區域與解釋區域使用相同背景，無立體陰影 */
         .word-blank {
             min-height: 90px;
             font-size: 48px;
@@ -138,7 +137,7 @@
             border-left: 4px solid #ffaa66;
             box-shadow: none;
         }
-        /* 按鈕列：左右分佈，左邊顯示生字，右邊兩個按鈕組 */
+        /* 按鈕列：左右分佈 */
         .btn-row {
             display: flex;
             justify-content: space-between;
@@ -154,6 +153,33 @@
         .btn-right {
             display: flex;
             gap: 12px;
+        }
+        /* 導航列：兩個按鈕平均佔滿整行 */
+        .nav-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .nav-btn {
+            flex: 1;
+            background: #e7e3d4;
+            color: #b45f2b;
+            border: 1px solid #ffbc7a;
+            border-radius: 60px;
+            padding: 12px 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: center;
+            transition: 0.1s;
+        }
+        .nav-btn:active {
+            transform: scale(0.96);
+        }
+        .nav-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: default;
         }
         .btn-icon {
             background: #ff914d;
@@ -176,12 +202,6 @@
             background: #e7e3d4;
             color: #b45f2b;
             border: 1px solid #ffbc7a;
-        }
-        .nav-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            margin-top: 15px;
         }
         .progress-text {
             text-align: center;
@@ -254,11 +274,6 @@
             padding: 15px;
             color: #a0815c;
         }
-        button:disabled {
-            opacity: 0.5;
-            transform: none;
-            cursor: default;
-        }
         .reading-disabled {
             opacity: 0.6;
             cursor: wait;
@@ -269,6 +284,7 @@
             .word-blank { font-size: 38px; }
             .btn-row { flex-direction: column; align-items: stretch; }
             .btn-left, .btn-right { justify-content: center; }
+            .nav-btn { padding: 10px 5px; font-size: 14px; }
         }
     </style>
 </head>
@@ -303,9 +319,8 @@
 
     <div id="wordPanel" style="display: block;">
         <div class="practice-card">
-            <div class="word-blank" id="wordDisplayArea">　　</div>
+            <div class="word-blank" id="wordDisplayArea"></div>
             <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
-            <!-- 按鈕區域：左邊顯示生字，右邊生字x3 + 解釋x1 -->
             <div class="btn-row">
                 <div class="btn-left">
                     <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
@@ -315,9 +330,10 @@
                     <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
                 </div>
             </div>
+            <!-- 導航按鈕：兩個按鈕平均佔滿整行 -->
             <div class="nav-row">
-                <button id="prevWordBtn" class="btn-icon btn-outline">⬅️ 上一個</button>
-                <button id="nextWordBtn" class="btn-icon btn-outline">➡️ 下一個</button>
+                <button id="prevWordBtn" class="nav-btn">⬅️ 上一個</button>
+                <button id="nextWordBtn" class="nav-btn">➡️ 下一個</button>
             </div>
             <div class="progress-text" id="wordProgress"></div>
             <button id="showAllWordsBtn" class="show-all-btn">📋 顯示所有生字</button>
@@ -769,7 +785,6 @@
             wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
             document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
         } else {
-            // 隱藏時完全清空，不顯示任何提示文字
             wordDiv.innerHTML = ``;
             document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
         }
@@ -886,7 +901,7 @@
         }
         const setTitle = (currentWordSet === "must") ? "必懂寫生字表" : "只需記認生字表";
         let tableHtml = `<table border="1" cellpadding="8" style="border-collapse:collapse; width:100%;">
-            <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
+            <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th><tr></thead><tbody>`;
         source.forEach(w => {
             tableHtml += `<tr><td style="font-weight:bold;">${w.character}</td><td>${w.explanation || ''}</td><td>${w.example || ''}</td><td>${w.day || ''}</td></tr>`;
         });
