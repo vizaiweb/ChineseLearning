@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>小二中文學習 - 識字與文章</title>
-    <!-- SheetJS 解析 Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
@@ -29,7 +28,6 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
 
-        /* 頭部 */
         .header {
             background: linear-gradient(135deg, #ffaa66, #ff7a3c);
             color: white;
@@ -46,7 +44,6 @@
             margin-top: 6px;
         }
 
-        /* 控制區 */
         .select-section {
             padding: 18px;
             background: #fef9e6;
@@ -74,23 +71,17 @@
             background: white;
             font-family: inherit;
         }
-        .btn-filter, .tab-btn, .action-btn {
-            background: #ff914d;
+        .btn-filter {
+            background: #2b7e3a;
             border: none;
             border-radius: 40px;
-            padding: 8px 18px;
+            padding: 8px 22px;
             color: white;
             font-weight: bold;
             cursor: pointer;
-            transition: 0.2s;
             font-size: 14px;
-            font-family: inherit;
         }
-        .btn-filter {
-            background: #2b7e3a;
-            padding: 8px 22px;
-        }
-        .btn-filter:active, .tab-btn:active, .action-btn:active {
+        .btn-filter:active {
             transform: scale(0.96);
         }
         .tab-group {
@@ -103,12 +94,23 @@
             background: #cfb284;
             flex: 1;
             text-align: center;
+            border: none;
+            border-radius: 40px;
+            padding: 10px 0;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            transition: 0.2s;
         }
         .tab-btn.active {
             background: #ff7a3c;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        /* 學習卡片區域 */
+        .tab-btn:active {
+            transform: scale(0.96);
+        }
         .practice-card {
             background: white;
             padding: 24px 20px;
@@ -191,7 +193,6 @@
             font-weight: bold;
             cursor: pointer;
         }
-        /* 文章區域 */
         .article-section {
             background: #fef5e6;
             margin: 10px 15px 20px 15px;
@@ -207,17 +208,23 @@
             margin-bottom: 12px;
             gap: 10px;
         }
-        .article-title-select {
+        .article-nav {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             flex: 2;
-            padding: 10px;
-            border-radius: 40px;
-            border: 1px solid #ffbc7a;
-            font-size: 15px;
+        }
+        .article-title-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #b45f2b;
+            text-align: center;
+            flex: 1;
+            min-width: 120px;
         }
         .article-buttons {
             display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            gap: 10px;
         }
         .article-content-box {
             background: #fffcf0;
@@ -228,6 +235,7 @@
             font-size: 17px;
             line-height: 1.65;
             white-space: pre-wrap;
+            word-break: break-word;
             color: #2c3a1f;
         }
         .footer {
@@ -241,10 +249,16 @@
             transform: none;
             cursor: default;
         }
+        .reading-disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
         @media (max-width: 550px) {
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
             .word-blank { font-size: 38px; }
+            .article-nav { flex-wrap: wrap; justify-content: center; }
+            .article-title-display { order: -1; width: 100%; }
         }
     </style>
 </head>
@@ -256,16 +270,14 @@
     </div>
 
     <div class="select-section">
-        <!-- 類似 word-review 的檔案選擇 -->
         <div class="select-row">
             <label>📁 課本：</label>
             <select id="fileSelect">
                 <option value="">-- 請選擇單元 --</option>
             </select>
         </div>
-        <!-- 日期篩選列 (Day filter) -->
         <div class="select-row" id="dayFilterRow" style="display: none;">
-            <label>📅 日期：</label>
+            <label>📅 課次：</label>
             <select id="daySelect">
                 <option value="all">全部課次</option>
                 <option value="custom">自訂課次</option>
@@ -273,7 +285,6 @@
             <input type="number" id="customDayNum" value="1" min="1" step="1" style="flex:1; min-width:70px;" disabled>
             <button id="filterDayBtn" class="btn-filter">🔍 篩選</button>
         </div>
-        <!-- 兩組生字＋文章 Tab -->
         <div class="tab-group">
             <button class="tab-btn active" data-tab="must">📝 必懂寫生字</button>
             <button class="tab-btn" data-tab="only">👀 只需記認生字</button>
@@ -281,7 +292,6 @@
         </div>
     </div>
 
-    <!-- 生字學習區域 (必懂/記認共用) -->
     <div id="wordPanel" style="display: block;">
         <div class="practice-card">
             <div class="word-blank" id="wordDisplayArea">　　</div>
@@ -300,20 +310,19 @@
         </div>
     </div>
 
-    <!-- 文章閱讀區域 (獨立) -->
     <div id="articlePanel" style="display: none;">
         <div class="article-section">
             <div class="article-header">
-    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%;">
-        <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 12px;">⬅️ 上一篇</button>
-        <span id="articleTitleDisplay" style="font-size: 20px; font-weight: bold; color: #b45f2b; flex: 1; text-align: center;">請選擇文章</span>
-        <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 12px;">下一篇 ➡️</button>
-    </div>
-    <div class="article-buttons">
-        <button id="readArticleBtn" class="btn-icon">🔊 讀3遍</button>
-        <button id="toggleArticleBtn" class="btn-icon">🙈 隱藏文章</button>
-    </div>
-</div>
+                <div class="article-nav">
+                    <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 14px;">⬅️ 上一篇</button>
+                    <span id="articleTitleDisplay" class="article-title-display">請選擇文章</span>
+                    <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 14px;">下一篇 ➡️</button>
+                </div>
+                <div class="article-buttons">
+                    <button id="readArticleBtn" class="btn-icon">🔊 朗讀</button>
+                    <button id="toggleArticleBtn" class="btn-icon">🙈 隱藏文章</button>
+                </div>
+            </div>
             <div id="articleContentBox" class="article-content-box">
                 請選擇文章
             </div>
@@ -325,7 +334,7 @@
 </div>
 
 <script>
-            // ---------- 全域變數 ----------
+    // ---------- 全域變數 ----------
     let allMustWords = [];
     let allOnlyWords = [];
     let articles = [];
@@ -351,7 +360,7 @@
     let currentReadingText = "";
     let readingTimeout = null;
     
-    // ---------- 語音引擎 (完全參考 word-review) ----------
+    // ---------- 語音引擎 ----------
     function getCantoneseVoice() {
         const voices = synth.getVoices();
         if (!voices || voices.length === 0) return null;
@@ -395,7 +404,7 @@
         return false;
     }
     
-    // 核心朗讀函數：朗讀一次（不自動停止其他）
+    // 朗讀一次（通用）
     function speakCantoneseOnce(text, onEnd) {
         if (!text || !text.trim()) {
             if (onEnd) onEnd();
@@ -443,21 +452,61 @@
         }
     }
     
-    // 朗讀三次（生字或文章）- 不會中途強制停止
+    // 朗讀一次（文章專用，帶按鈕狀態，可中斷）
+    function speakArticleOnce(text, buttonElement) {
+        if (!text) return;
+        
+        if (isCantoneseReading && currentCantoneseButton === buttonElement) {
+            try { synth.cancel(); } catch(e) {}
+            if (readingTimeout) clearTimeout(readingTimeout);
+            isCantoneseReading = false;
+            if (currentCantoneseButton) {
+                currentCantoneseButton.textContent = "🔊 朗讀";
+                currentCantoneseButton.classList.remove('reading-disabled');
+                currentCantoneseButton = null;
+            }
+            return;
+        }
+        
+        if (isCantoneseReading) {
+            try { synth.cancel(); } catch(e) {}
+            if (readingTimeout) clearTimeout(readingTimeout);
+        }
+        
+        if (buttonElement) {
+            currentCantoneseButton = buttonElement;
+            currentReadingText = text;
+            isCantoneseReading = true;
+            buttonElement.textContent = "⏹️ 停止";
+            buttonElement.classList.add('reading-disabled');
+        }
+        
+        ensureCantoneseEngine(() => {
+            if (!isCantoneseReading) return;
+            speakCantoneseOnce(text, () => {
+                if (currentCantoneseButton) {
+                    currentCantoneseButton.textContent = "🔊 朗讀";
+                    currentCantoneseButton.classList.remove('reading-disabled');
+                    currentCantoneseButton = null;
+                }
+                isCantoneseReading = false;
+                currentReadingText = "";
+                if (readingTimeout) clearTimeout(readingTimeout);
+            });
+        });
+    }
+    
+    // 朗讀三次（生字專用）
     function speakThreeTimes(text, buttonElement = null) {
         if (!text) return;
         
-        // 如果正在朗讀且是同一個按鈕，則停止
         if (isCantoneseReading && currentCantoneseButton === buttonElement) {
-            // 停止朗讀
             try { synth.cancel(); } catch(e) {}
             if (readingTimeout) clearTimeout(readingTimeout);
             isCantoneseReading = false;
             if (currentCantoneseButton) {
                 if (currentCantoneseButton.id === 'readWordThreeBtn') {
                     currentCantoneseButton.textContent = "🔊 生字讀3遍";
-                } else if (currentCantoneseButton.id === 'readArticleBtn') {
-                    currentCantoneseButton.textContent = "🔊 讀3遍";
                 }
                 currentCantoneseButton.classList.remove('reading-disabled');
                 currentCantoneseButton = null;
@@ -465,13 +514,11 @@
             return;
         }
         
-        // 停止其他朗讀
         if (isCantoneseReading) {
             try { synth.cancel(); } catch(e) {}
             if (readingTimeout) clearTimeout(readingTimeout);
         }
         
-        // 設定新朗讀狀態
         if (buttonElement) {
             currentCantoneseButton = buttonElement;
             currentReadingText = text;
@@ -485,13 +532,8 @@
         function readNext() {
             if (!isCantoneseReading) return;
             if (timesRead >= 3) {
-                // 完成三次朗讀，重置按鈕
                 if (currentCantoneseButton) {
-                    if (currentCantoneseButton.id === 'readWordThreeBtn') {
-                        currentCantoneseButton.textContent = "🔊 生字讀3遍";
-                    } else if (currentCantoneseButton.id === 'readArticleBtn') {
-                        currentCantoneseButton.textContent = "🔊 讀3遍";
-                    }
+                    currentCantoneseButton.textContent = "🔊 生字讀3遍";
                     currentCantoneseButton.classList.remove('reading-disabled');
                     currentCantoneseButton = null;
                 }
@@ -504,13 +546,8 @@
                 if (isCantoneseReading && timesRead < 3) {
                     readingTimeout = setTimeout(readNext, 500);
                 } else if (timesRead >= 3) {
-                    // 完成後重置
                     if (currentCantoneseButton) {
-                        if (currentCantoneseButton.id === 'readWordThreeBtn') {
-                            currentCantoneseButton.textContent = "🔊 生字讀3遍";
-                        } else if (currentCantoneseButton.id === 'readArticleBtn') {
-                            currentCantoneseButton.textContent = "🔊 讀3遍";
-                        }
+                        currentCantoneseButton.textContent = "🔊 生字讀3遍";
                         currentCantoneseButton.classList.remove('reading-disabled');
                         currentCantoneseButton = null;
                     }
@@ -523,11 +560,10 @@
         ensureCantoneseEngine(readNext);
     }
     
-    // 朗讀一次（解釋專用）- 朗讀完自動重置，不強制停止
+    // 朗讀一次（解釋專用）
     function speakExplanationOnce(text, buttonElement) {
         if (!text) return;
         
-        // 如果正在朗讀且是同一個按鈕，則停止
         if (isCantoneseReading && currentCantoneseButton === buttonElement) {
             try { synth.cancel(); } catch(e) {}
             if (readingTimeout) clearTimeout(readingTimeout);
@@ -540,13 +576,11 @@
             return;
         }
         
-        // 停止其他朗讀
         if (isCantoneseReading) {
             try { synth.cancel(); } catch(e) {}
             if (readingTimeout) clearTimeout(readingTimeout);
         }
         
-        // 設定新朗讀狀態
         if (buttonElement) {
             currentCantoneseButton = buttonElement;
             currentReadingText = text;
@@ -558,7 +592,6 @@
         ensureCantoneseEngine(() => {
             if (!isCantoneseReading) return;
             speakCantoneseOnce(text, () => {
-                // 朗讀完成，重置按鈕
                 if (currentCantoneseButton) {
                     currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
                     currentCantoneseButton.classList.remove('reading-disabled');
@@ -581,7 +614,7 @@
                 } else if (currentCantoneseButton.id === 'readMeaningBtn') {
                     currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
                 } else if (currentCantoneseButton.id === 'readArticleBtn') {
-                    currentCantoneseButton.textContent = "🔊 讀3遍";
+                    currentCantoneseButton.textContent = "🔊 朗讀";
                 }
                 currentCantoneseButton.classList.remove('reading-disabled');
                 currentCantoneseButton = null;
@@ -591,7 +624,6 @@
         }
     }
     
-    // 預熱語音引擎
     setTimeout(() => {
         ensureCantoneseEngine(() => { console.log('粵語語音引擎已就緒'); });
     }, 1000);
@@ -665,10 +697,16 @@
             if (currentWordSet === "must") refreshWordList("must");
             else if (currentWordSet === "only") refreshWordList("only");
             
-            // 更新文章顯示（不使用下拉選單）
-            updateArticleDisplay();
-            if (articles.length > 0) showArticle(0);
-            else document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
+            // 更新文章顯示
+            if (articles.length > 0) {
+                currentArticleIndex = 0;
+                updateArticleNavButtons();
+                showArticle(0);
+            } else {
+                document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
+                document.getElementById("articleTitleDisplay").textContent = "無文章";
+                updateArticleNavButtons();
+            }
             
             document.getElementById("dayFilterRow").style.display = "flex";
             return true;
@@ -742,64 +780,66 @@
         stopAllSpeech();
     }
     
-    // 文章顯示相關函數（不使用下拉選單）
-    function updateArticleDisplay() {
-        // 修改文章區域的 HTML 結構：移除下拉選單，改為標題文字 + 上一篇/下一篇按鈕
-        const articleHeader = document.querySelector('.article-header');
-        if (articleHeader && !articleHeader.querySelector('.article-title-display')) {
-            // 重建文章標題區域
-            articleHeader.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%;">
-                    <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 12px;">⬅️ 上一篇</button>
-                    <span id="articleTitleDisplay" style="font-size: 20px; font-weight: bold; color: #b45f2b; flex: 1; text-align: center;">請選擇文章</span>
-                    <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 12px;">下一篇 ➡️</button>
-                </div>
-                <div class="article-buttons">
-                    <button id="readArticleBtn" class="btn-icon">🔊 讀3遍</button>
-                    <button id="toggleArticleBtn" class="btn-icon">🙈 隱藏文章</button>
-                </div>
-            `;
-            // 重新綁定事件
-            document.getElementById("prevArticleBtn")?.addEventListener("click", () => {
-                if (articles.length > 0) {
-                    currentArticleIndex = (currentArticleIndex - 1 + articles.length) % articles.length;
-                    showArticle(currentArticleIndex);
-                    stopAllSpeech();
-                }
-            });
-            document.getElementById("nextArticleBtn")?.addEventListener("click", () => {
-                if (articles.length > 0) {
-                    currentArticleIndex = (currentArticleIndex + 1) % articles.length;
-                    showArticle(currentArticleIndex);
-                    stopAllSpeech();
-                }
-            });
-            document.getElementById("readArticleBtn")?.addEventListener("click", () => {
-                if (articles.length > 0) {
-                    const art = articles[currentArticleIndex];
-                    if (art && art.content) speakThreeTimes(art.content, document.getElementById("readArticleBtn"));
-                }
-            });
-            document.getElementById("toggleArticleBtn")?.addEventListener("click", () => {
-                toggleArticleVisibility();
-            });
+    // 文章相關函數
+    function updateArticleNavButtons() {
+        const prevBtn = document.getElementById("prevArticleBtn");
+        const nextBtn = document.getElementById("nextArticleBtn");
+        if (articles.length === 0) {
+            if (prevBtn) prevBtn.disabled = true;
+            if (nextBtn) nextBtn.disabled = true;
+            return;
         }
+        if (prevBtn) prevBtn.disabled = (currentArticleIndex === 0);
+        if (nextBtn) nextBtn.disabled = (currentArticleIndex === articles.length - 1);
     }
     
     function showArticle(index) {
         if (!articles.length) return;
+        if (index < 0) index = 0;
+        if (index >= articles.length) index = articles.length - 1;
         currentArticleIndex = index;
         const art = articles[currentArticleIndex];
-        const titleSpan = document.getElementById("articleTitleDisplay");
-        if (titleSpan) titleSpan.textContent = art.title;
+        document.getElementById("articleTitleDisplay").textContent = art.title;
         const contentDiv = document.getElementById("articleContentBox");
         if (!isArticleHidden) {
-            // 使用 pre-wrap 確保完整顯示所有文字
             contentDiv.style.whiteSpace = "pre-wrap";
-            contentDiv.style.wordBreak = "break-word";
             contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
         } else {
             contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
+        }
+        updateArticleNavButtons();
+    }
+    
+    function prevArticle() {
+        if (articles.length > 0 && currentArticleIndex > 0) {
+            currentArticleIndex--;
+            showArticle(currentArticleIndex);
+            stopAllSpeech();
+            // 如果文章是隱藏狀態，切換後仍然隱藏，但需更新內容區域
+            const contentDiv = document.getElementById("articleContentBox");
+            if (isArticleHidden) {
+                contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
+            } else {
+                const art = articles[currentArticleIndex];
+                contentDiv.style.whiteSpace = "pre-wrap";
+                contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
+            }
+        }
+    }
+    
+    function nextArticle() {
+        if (articles.length > 0 && currentArticleIndex < articles.length - 1) {
+            currentArticleIndex++;
+            showArticle(currentArticleIndex);
+            stopAllSpeech();
+            const contentDiv = document.getElementById("articleContentBox");
+            if (isArticleHidden) {
+                contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
+            } else {
+                const art = articles[currentArticleIndex];
+                contentDiv.style.whiteSpace = "pre-wrap";
+                contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
+            }
         }
     }
     
@@ -820,6 +860,14 @@
             }
             btn.textContent = "🙈 隱藏文章";
         }
+    }
+    
+    function readArticleOnce() {
+        if (!articles.length) return;
+        const art = articles[currentArticleIndex];
+        if (!art.content) return;
+        const button = document.getElementById("readArticleBtn");
+        speakArticleOnce(art.content, button);
     }
     
     function showAllWordsPopup() {
@@ -866,29 +914,22 @@
     }
     
     function bindWordEvents() {
-        const toggleBtn = document.getElementById("toggleWordBtn");
-        const readWord3Btn = document.getElementById("readWordThreeBtn");
-        const readMeaningBtn = document.getElementById("readMeaningBtn");
-        const prevBtn = document.getElementById("prevWordBtn");
-        const nextBtn = document.getElementById("nextWordBtn");
-        const showAllBtn = document.getElementById("showAllWordsBtn");
-        
-        toggleBtn.onclick = () => {
+        document.getElementById("toggleWordBtn").onclick = () => {
             if (!currentFilteredWords.length) return;
             isWordVisible = !isWordVisible;
             renderCurrentWord();
         };
-        readWord3Btn.onclick = () => {
+        document.getElementById("readWordThreeBtn").onclick = () => {
             if (!currentFilteredWords.length) return;
             const w = currentFilteredWords[currentWordIndex];
-            if (w && w.character) speakThreeTimes(w.character, readWord3Btn);
+            if (w && w.character) speakThreeTimes(w.character, document.getElementById("readWordThreeBtn"));
         };
-        readMeaningBtn.onclick = () => {
+        document.getElementById("readMeaningBtn").onclick = () => {
             if (!currentFilteredWords.length) return;
             const w = currentFilteredWords[currentWordIndex];
-            if (w && w.explanation) speakExplanationOnce(w.explanation, readMeaningBtn);
+            if (w && w.explanation) speakExplanationOnce(w.explanation, document.getElementById("readMeaningBtn"));
         };
-        prevBtn.onclick = () => {
+        document.getElementById("prevWordBtn").onclick = () => {
             if (currentWordIndex > 0) {
                 currentWordIndex--;
                 isWordVisible = false;
@@ -896,7 +937,7 @@
                 stopAllSpeech();
             }
         };
-        nextBtn.onclick = () => {
+        document.getElementById("nextWordBtn").onclick = () => {
             if (currentWordIndex + 1 < currentFilteredWords.length) {
                 currentWordIndex++;
                 isWordVisible = false;
@@ -906,12 +947,18 @@
                 alert("🎉 已完成本組所有生字！好厲害～");
             }
         };
-        showAllBtn.onclick = showAllWordsPopup;
+        document.getElementById("showAllWordsBtn").onclick = showAllWordsPopup;
+    }
+    
+    function bindArticleEvents() {
+        document.getElementById("prevArticleBtn").onclick = () => prevArticle();
+        document.getElementById("nextArticleBtn").onclick = () => nextArticle();
+        document.getElementById("readArticleBtn").onclick = () => readArticleOnce();
+        document.getElementById("toggleArticleBtn").onclick = () => toggleArticleVisibility();
     }
     
     function bindTabSwitching() {
-        const tabs = document.querySelectorAll(".tab-btn");
-        tabs.forEach(btn => {
+        document.querySelectorAll(".tab-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 const tab = btn.getAttribute("data-tab");
                 if (tab === "must") {
@@ -922,13 +969,11 @@
                     document.getElementById("wordPanel").style.display = "none";
                     document.getElementById("articlePanel").style.display = "block";
                     stopAllSpeech();
-                    updateArticleDisplay();  // 確保文章區域使用新結構
-                    if (articles.length && !isArticleHidden) {
+                    if (articles.length) {
+                        updateArticleNavButtons();
                         const art = articles[currentArticleIndex];
-                        if (art) {
-                            const contentDiv = document.getElementById("articleContentBox");
-                            contentDiv.style.whiteSpace = "pre-wrap";
-                            contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
+                        if (art && !isArticleHidden) {
+                            document.getElementById("articleContentBox").innerHTML = art.content.replace(/\n/g, '<br>');
                         }
                     }
                     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
@@ -939,8 +984,7 @@
     }
     
     function bindFileSelect() {
-        const fileSelect = document.getElementById("fileSelect");
-        fileSelect.addEventListener("change", async (e) => {
+        document.getElementById("fileSelect").addEventListener("change", async (e) => {
             const filename = e.target.value;
             if (!filename) return;
             await loadExcelFile(filename);
@@ -952,8 +996,10 @@
             } else {
                 document.getElementById("wordPanel").style.display = "none";
                 document.getElementById("articlePanel").style.display = "block";
-                updateArticleDisplay();
-                if (articles.length) showArticle(0);
+                if (articles.length) {
+                    updateArticleNavButtons();
+                    showArticle(currentArticleIndex);
+                }
             }
         });
     }
@@ -962,6 +1008,7 @@
         await loadFileList();
         bindFileSelect();
         bindWordEvents();
+        bindArticleEvents();
         bindTabSwitching();
         initDaySelectToggle();
         document.getElementById("wordPanel").style.display = "block";
