@@ -322,7 +322,7 @@
 </div>
 
 <script>
-    // ---------- 全域變數 ----------
+        // ---------- 全域變數 ----------
     let allMustWords = [];     // 必懂寫 [{ character, explanation, example, day }]
     let allOnlyWords = [];     // 只需記認
     let articles = [];         // [{ title, content }]
@@ -341,94 +341,225 @@
     let currentSpeechUtterance = null;   // 追蹤朗讀以便停止
     let isReadingActive = false;
     
-    // 粵語語音引擎 (復用 word-review 邏輯)
+    // 粵語語音引擎 (完全參考 word-review 的 TTS 實現)
     let synth = window.speechSynthesis;
     let cantoneseVoice = null;
-    let voiceReady = false;
+    let cantoneseVoiceEngineReady = false;
     
-    // ---------- 初始化語音引擎 ----------
+    // 朗讀狀態管理 (參考 word-review)
+    let isCantoneseReading = false;
+    let currentCantoneseButton = null;
+    let currentCantoneseText = "";
+    
+    // ---------- 初始化語音引擎 (完全採用 word-review 邏輯) ----------
     function getCantoneseVoice() {
         const voices = synth.getVoices();
         if (!voices || voices.length === 0) return null;
-        return voices.find(v => v.lang === 'yue' || v.lang === 'zh-HK' || v.name?.includes('Ting-Ting') || v.name?.includes('Sin-Ji')) || null;
+        
+        // 按照 word-review 的優先順序：Sin-Ji (Mac 高品質粵語) > Google 粵語 > 任何 yue/zh-HK
+        return voices.find(v => v.name && v.name === 'Sin-Ji') ||
+               voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
+               voices.find(v => v.name && v.name.includes('Cantonese')) ||
+               voices.find(v => v.lang === 'yue') ||
+               voices.find(v => v.lang === 'zh-HK') ||
+               voices.find(v => v.lang && v.lang.includes('hk')) ||
+               null;
     }
     
-    function ensureVoice(callback) {
-        if (voiceReady && cantoneseVoice) {
+    // 預熱粵語引擎 (與 word-review 相同)
+    function ensureCantoneseEngine(callback) {
+        if (cantoneseVoiceEngineReady && cantoneseVoice) {
             if (callback) callback();
-            return;
+            return true;
         }
-        const dummy = new SpeechSynthesisUtterance('');
-        dummy.volume = 0;
-        const voice = getCantoneseVoice();
-        if (voice) cantoneseVoice = voice;
-        dummy.onend = () => {
-            voiceReady = true;
-            if (callback) callback();
-        };
-        synth.speak(dummy);
-        setTimeout(() => {
-            if (!voiceReady) {
-                voiceReady = true;
-                if (callback) callback();
+        
+        try {
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0;
+            const voice = getCantoneseVoice();
+            if (voice) {
+                cantoneseVoice = voice;
+                silent.voice = voice;
             }
-        }, 500);
+            
+            silent.onend = () => {
+                cantoneseVoiceEngineReady = true;
+                if (callback) callback();
+            };
+            
+            synth.speak(silent);
+            setTimeout(() => {
+                if (!cantoneseVoiceEngineReady) {
+                    cantoneseVoiceEngineReady = true;
+                    if (callback) callback();
+                }
+            }, 500);
+        } catch(e) {
+            cantoneseVoiceEngineReady = true;
+            if (callback) callback();
+        }
+        return false;
     }
     
+    // 粵語朗讀一次 (完全參考 word-review 的 speakCantoneseOnce)
     function speakCantoneseOnce(text, onEnd) {
         if (!text || !text.trim()) {
             if (onEnd) onEnd();
             return;
         }
-        // 停止正在進行的朗讀避免重疊
+        
+        // 停止可能衝突的語音
         try { synth.cancel(); } catch(e) {}
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "yue";
-        utterance.rate = 0.9;
+        utterance.rate = 0.85;
         utterance.pitch = 1.0;
+        utterance.volume = 1;
+        
         const voice = getCantoneseVoice();
-        if (voice) utterance.voice = voice;
+        if (voice) {
+            utterance.voice = voice;
+            cantoneseVoice = voice;
+        }
+        
         let ended = false;
+        
         utterance.onend = () => {
-            if (!ended) { ended = true; if (onEnd) onEnd(); }
+            if (!ended) {
+                ended = true;
+                if (onEnd) onEnd();
+            }
         };
-        utterance.onerror = () => {
-            if (!ended) { ended = true; if (onEnd) onEnd(); }
+        
+        utterance.onerror = (err) => {
+            console.error('Cantonese speech error:', err);
+            if (!ended) {
+                ended = true;
+                if (onEnd) onEnd();
+            }
         };
-        synth.speak(utterance);
-        setTimeout(() => {
-            if (!ended) { ended = true; if (onEnd) onEnd(); }
-        }, Math.max(800, text.length * 90));
+        
+        try {
+            synth.speak(utterance);
+            // 安全計時器
+            setTimeout(() => {
+                if (!ended) {
+                    ended = true;
+                    if (onEnd) onEnd();
+                }
+            }, Math.max(1000, text.length * 100));
+        } catch(e) {
+            if (onEnd) onEnd();
+        }
     }
     
-    function speakThreeTimes(text) {
+    // 朗讀三次 (生字或文章專用，帶按鈕狀態管理)
+    function speakThreeTimes(text, buttonElement = null) {
         if (!text) return;
-        let times = 0;
-        function speakNext() {
-            if (times < 3) {
-                speakCantoneseOnce(text, () => {
-                    times++;
-                    setTimeout(speakNext, 500);
-                });
-            }
+        
+        // 如果傳入按鈕且正在朗讀同一個按鈕，則停止
+        if (buttonElement && isCantoneseReading && currentCantoneseButton === buttonElement) {
+            stopCantoneseReading();
+            return;
         }
-        speakNext();
+        
+        stopCantoneseReading();
+        
+        if (buttonElement) {
+            currentCantoneseButton = buttonElement;
+            currentCantoneseText = text;
+            isCantoneseReading = true;
+            buttonElement.textContent = "⏹️ 停止";
+            buttonElement.classList.add('reading-disabled');
+        }
+        
+        let timesRead = 0;
+        
+        function readNext() {
+            if (!isCantoneseReading) return;
+            if (timesRead >= 3) {
+                stopCantoneseReading();
+                return;
+            }
+            timesRead++;
+            speakCantoneseOnce(text, () => {
+                if (isCantoneseReading && timesRead < 3) {
+                    setTimeout(readNext, 500);
+                } else if (timesRead >= 3) {
+                    stopCantoneseReading();
+                }
+            });
+        }
+        
+        ensureCantoneseEngine(readNext);
+    }
+    
+    // 朗讀一次 (解釋專用，帶按鈕狀態)
+    function speakOnceWithButton(text, buttonElement) {
+        if (!text) return;
+        
+        if (isCantoneseReading && currentCantoneseButton === buttonElement) {
+            stopCantoneseReading();
+            return;
+        }
+        
+        stopCantoneseReading();
+        
+        if (buttonElement) {
+            currentCantoneseButton = buttonElement;
+            currentCantoneseText = text;
+            isCantoneseReading = true;
+            buttonElement.textContent = "⏹️ 停止";
+            buttonElement.classList.add('reading-disabled');
+        }
+        
+        ensureCantoneseEngine(() => {
+            if (!isCantoneseReading) return;
+            speakCantoneseOnce(text, () => {
+                stopCantoneseReading();
+            });
+        });
+    }
+    
+    function stopCantoneseReading() {
+        if (!isCantoneseReading) return;
+        isCantoneseReading = false;
+        
+        try { synth.cancel(); } catch(e) {}
+        
+        if (currentCantoneseButton) {
+            // 根據按鈕原本功能恢復文字
+            if (currentCantoneseButton.id === 'readWordThreeBtn') {
+                currentCantoneseButton.textContent = "🔊 生字讀3遍";
+            } else if (currentCantoneseButton.id === 'readMeaningBtn') {
+                currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
+            } else if (currentCantoneseButton.id === 'readArticleBtn') {
+                currentCantoneseButton.textContent = "🔊 讀3遍";
+            } else {
+                currentCantoneseButton.textContent = "🔊 朗讀";
+            }
+            currentCantoneseButton.classList.remove('reading-disabled');
+            currentCantoneseButton = null;
+        }
+        currentCantoneseText = "";
     }
     
     function stopAllSpeech() {
-        try { synth.cancel(); } catch(e) {}
-        isReadingActive = false;
-        if (currentSpeechUtterance) currentSpeechUtterance = null;
+        stopCantoneseReading();
     }
     
-    // ---------- 讀取 GitHub Excel (預設放在 data/chinese/ 下，可調整路徑) ----------
-    // 檔案清單: 手動定義或者透過 fileList.json，這裡按照 word-review 模式 建立 fileList.json
+    // 預熱語音引擎
+    setTimeout(() => {
+        ensureCantoneseEngine(() => { console.log('粵語語音引擎已就緒 (參考 word-review TTS)'); });
+    }, 1000);
+    
+    // ---------- 讀取 GitHub Excel ----------
     const BASE_URL = window.location.href.includes('github.io') ? 
         window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/') : 
         './';
-    const DATA_PATH = `${BASE_URL}data/chinese/`;   // 存放 Excel 與 fileList.json
+    const DATA_PATH = `${BASE_URL}data/chinese/`;
     
-    // 載入檔案清單
     async function loadFileList() {
         try {
             const listUrl = `${DATA_PATH}fileList.json`;
@@ -446,12 +577,11 @@
             });
             if (files.length > 0) fileSelect.disabled = false;
         } catch(e) {
-            console.warn("無法讀取 fileList.json，請依照目錄結構建立 data/chinese/fileList.json", e);
+            console.warn("無法讀取 fileList.json", e);
             document.getElementById('fileSelect').innerHTML = '<option value="">無法載入清單</option>';
         }
     }
     
-    // 解析 Excel (三個工作表)
     async function loadExcelFile(filename) {
         if (!filename) return false;
         currentFileName = filename;
@@ -461,7 +591,6 @@
             if (!resp.ok) throw new Error(`下載失敗 ${resp.status}`);
             const ab = await resp.arrayBuffer();
             const wb = XLSX.read(ab, { type: 'array' });
-            // 工作表1: 必懂寫
             const sheet1 = wb.Sheets["必懂寫"];
             if (sheet1) {
                 const rows = XLSX.utils.sheet_to_json(sheet1);
@@ -472,7 +601,6 @@
                     day: row["日期"] !== undefined ? String(row["日期"]).trim() : ""
                 })).filter(w => w.character);
             } else allMustWords = [];
-            // 工作表2: 只需記認
             const sheet2 = wb.Sheets["只需記認"];
             if (sheet2) {
                 const rows = XLSX.utils.sheet_to_json(sheet2);
@@ -483,7 +611,6 @@
                     day: row["日期"] !== undefined ? String(row["日期"]).trim() : ""
                 })).filter(w => w.character);
             } else allOnlyWords = [];
-            // 工作表3: 文章 (欄位: 標題, 文章)
             const sheet3 = wb.Sheets["文章"];
             if (sheet3) {
                 const rows = XLSX.utils.sheet_to_json(sheet3);
@@ -493,11 +620,9 @@
                 })).filter(a => a.title && a.content);
             } else articles = [];
             
-            // 初始化 UI
             if (currentWordSet === "must") refreshWordList("must");
             else if (currentWordSet === "only") refreshWordList("only");
             
-            // 設定文章下拉選單
             populateArticleSelect();
             if (articles.length > 0) showArticle(0);
             else document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
@@ -514,7 +639,6 @@
     function refreshWordList(setType) {
         currentWordSet = setType;
         const sourceWords = (setType === "must") ? allMustWords : allOnlyWords;
-        // 日期篩選狀態
         const daySelect = document.getElementById("daySelect");
         const customNum = document.getElementById("customDayNum");
         let filterValue = daySelect.value;
@@ -549,39 +673,32 @@
         }
         const w = currentFilteredWords[currentWordIndex];
         if (!w) return;
-        // 解釋固定顯示
         document.getElementById("meaningArea").innerHTML = `📖 ${w.explanation || "（無解釋）"}`;
-        // 生字區域控制顯示隱藏
         const wordDiv = document.getElementById("wordDisplayArea");
         if (isWordVisible) {
             wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
             document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
         } else {
-            wordDiv.innerHTML = `<span style="opacity:0;">　</span>`;  // 完全空白無占位符
+            wordDiv.innerHTML = `<span style="opacity:0;">　</span>`;
             document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
         }
         const total = currentFilteredWords.length;
         document.getElementById("wordProgress").innerHTML = `📌 第 ${currentWordIndex+1} / ${total} 字 &nbsp;| 課次: ${w.day || "—"}`;
-        // 上一頁下一頁 disabled 狀態
         document.getElementById("prevWordBtn").disabled = (currentWordIndex === 0);
         document.getElementById("nextWordBtn").disabled = (currentWordIndex === total-1);
     }
     
-    // 切換生字組
     function switchWordSet(set) {
         currentWordSet = set;
         refreshWordList(set);
-        // 同步tab按鈕樣式
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         if (set === 'must') document.querySelector('[data-tab="must"]').classList.add('active');
         else if (set === 'only') document.querySelector('[data-tab="only"]').classList.add('active');
-        // 若文章面板顯示則切換回來
         document.getElementById("wordPanel").style.display = "block";
         document.getElementById("articlePanel").style.display = "none";
         stopAllSpeech();
     }
     
-    // 文章下拉
     function populateArticleSelect() {
         const select = document.getElementById("articleSelect");
         select.innerHTML = "";
@@ -631,11 +748,10 @@
         if (!articles.length) return;
         const art = articles[currentArticleIndex];
         if (!art.content) return;
-        stopAllSpeech();
-        speakThreeTimes(art.content);
+        const button = document.getElementById("readArticleBtn");
+        speakThreeTimes(art.content, button);
     }
     
-    // 顯示所有生字 (彈窗)
     function showAllWordsPopup() {
         const source = (currentWordSet === "must") ? allMustWords : allOnlyWords;
         if (!source.length) {
@@ -658,13 +774,11 @@
         }
     }
     
-    // 日期篩選邏輯
     function applyDayFilter() {
         if (!currentFileName) return;
         refreshWordList(currentWordSet);
     }
     
-    // 監聽自訂日期開關
     function initDaySelectToggle() {
         const daySelect = document.getElementById("daySelect");
         const customInput = document.getElementById("customDayNum");
@@ -681,7 +795,6 @@
         document.getElementById("filterDayBtn").addEventListener("click", applyDayFilter);
     }
     
-    // 綁定生字按鈕事件 (動態刷新綁定)
     function bindWordEvents() {
         const toggleBtn = document.getElementById("toggleWordBtn");
         const readWord3Btn = document.getElementById("readWordThreeBtn");
@@ -698,12 +811,12 @@
         readWord3Btn.onclick = () => {
             if (!currentFilteredWords.length) return;
             const w = currentFilteredWords[currentWordIndex];
-            if (w && w.character) speakThreeTimes(w.character);
+            if (w && w.character) speakThreeTimes(w.character, readWord3Btn);
         };
         readMeaningBtn.onclick = () => {
             if (!currentFilteredWords.length) return;
             const w = currentFilteredWords[currentWordIndex];
-            if (w && w.explanation) speakCantoneseOnce(w.explanation);
+            if (w && w.explanation) speakOnceWithButton(w.explanation, readMeaningBtn);
         };
         prevBtn.onclick = () => {
             if (currentWordIndex > 0) {
@@ -726,7 +839,6 @@
         showAllBtn.onclick = showAllWordsPopup;
     }
     
-    // 文章模塊事件
     function bindArticleEvents() {
         const readBtn = document.getElementById("readArticleBtn");
         const stopBtn = document.getElementById("stopArticleBtn");
@@ -736,7 +848,6 @@
         toggleBtn.onclick = () => { toggleArticleVisibility(); };
     }
     
-    // Tab 切換邏輯
     function bindTabSwitching() {
         const tabs = document.querySelectorAll(".tab-btn");
         tabs.forEach(btn => {
@@ -761,14 +872,12 @@
         });
     }
     
-    // 檔案選擇監聽
     function bindFileSelect() {
         const fileSelect = document.getElementById("fileSelect");
         fileSelect.addEventListener("change", async (e) => {
             const filename = e.target.value;
             if (!filename) return;
             await loadExcelFile(filename);
-            // 重置顯示與隱藏狀態
             isWordVisible = false;
             if (currentWordSet !== "article") {
                 document.getElementById("wordPanel").style.display = "block";
@@ -781,7 +890,6 @@
         });
     }
     
-    // 主初始化
     window.addEventListener("DOMContentLoaded", async () => {
         await loadFileList();
         bindFileSelect();
@@ -789,11 +897,8 @@
         bindArticleEvents();
         bindTabSwitching();
         initDaySelectToggle();
-        ensureVoice(() => { console.log("粵語語音就緒"); });
-        // 預設面板
         document.getElementById("wordPanel").style.display = "block";
         document.getElementById("articlePanel").style.display = "none";
-        // 若沒有文章則隱藏文章相關提示可忽略
     });
 </script>
 </body>
