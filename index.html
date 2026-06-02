@@ -129,22 +129,31 @@
         }
         .meaning-area {
             font-size: 22px;
-            background: #fef2e0;      /* 與生字區域背景相同 */
+            background: #fef2e0;
             padding: 14px;
             border-radius: 28px;
             color: #2d4a22;
             margin: 12px 0;
             text-align: center;
-            /* 移除陰影效果：去掉 border-left 立體感，改用純色邊框 */
             border-left: 4px solid #ffaa66;
             box-shadow: none;
         }
+        /* 按鈕列：左右分佈，左邊顯示生字，右邊兩個按鈕組 */
         .btn-row {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-            justify-content: center;
             margin: 18px 0 12px;
+        }
+        .btn-left {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-right {
+            display: flex;
+            gap: 12px;
         }
         .btn-icon {
             background: #ff914d;
@@ -198,7 +207,6 @@
             padding: 18px;
             border-top: 3px solid #ffb157;
         }
-        /* 文章標題區塊：只放標題和按鈕，導航移到下方 */
         .article-header {
             display: flex;
             align-items: center;
@@ -232,7 +240,6 @@
             word-break: break-word;
             color: #2c3a1f;
         }
-        /* 文章導航按鈕容器：放在內容框下方 */
         .article-nav-footer {
             display: flex;
             align-items: center;
@@ -256,19 +263,12 @@
             opacity: 0.6;
             cursor: wait;
         }
-        /* 生字隱藏時的提示樣式：與文章隱藏提示完全一致 */
-        .word-placeholder {
-            font-size: 1.2rem;
-            color: #7a6a5a;
-            font-weight: normal;
-            letter-spacing: normal;
-            background: transparent;
-            display: inline-block;
-        }
         @media (max-width: 550px) {
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
             .word-blank { font-size: 38px; }
+            .btn-row { flex-direction: column; align-items: stretch; }
+            .btn-left, .btn-right { justify-content: center; }
         }
     </style>
 </head>
@@ -305,10 +305,15 @@
         <div class="practice-card">
             <div class="word-blank" id="wordDisplayArea">　　</div>
             <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
+            <!-- 按鈕區域：左邊顯示生字，右邊生字x3 + 解釋x1 -->
             <div class="btn-row">
-                <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
-                <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
-                <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
+                <div class="btn-left">
+                    <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
+                </div>
+                <div class="btn-right">
+                    <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
+                    <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
+                </div>
             </div>
             <div class="nav-row">
                 <button id="prevWordBtn" class="btn-icon btn-outline">⬅️ 上一個</button>
@@ -331,7 +336,6 @@
             <div id="articleContentBox" class="article-content-box">
                 請選擇文章
             </div>
-            <!-- 文章導航按鈕：放在文字框下方 -->
             <div class="article-nav-footer">
                 <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">⬅️ 上一篇</button>
                 <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">下一篇 ➡️</button>
@@ -414,7 +418,6 @@
         return false;
     }
     
-    // 朗讀一次（通用）
     function speakCantoneseOnce(text, onEnd) {
         if (!text || !text.trim()) {
             if (onEnd) onEnd();
@@ -462,7 +465,6 @@
         }
     }
     
-    // 朗讀一次（文章專用）
     function speakArticleOnce(text, buttonElement) {
         if (!text) return;
         
@@ -506,7 +508,6 @@
         });
     }
     
-    // 朗讀三次（生字專用）按鈕文字改為 "🔊 生字x3"
     function speakThreeTimes(text, buttonElement = null) {
         if (!text) return;
         
@@ -570,7 +571,6 @@
         ensureCantoneseEngine(readNext);
     }
     
-    // 朗讀一次（解釋專用）按鈕文字改為 "🗣️ 解釋x1"
     function speakExplanationOnce(text, buttonElement) {
         if (!text) return;
         
@@ -769,8 +769,8 @@
             wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
             document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
         } else {
-            // 隱藏時顯示與文章隱藏相同樣式的提示，文字改為「📖 文字已隱藏，點擊「顯示生字」」
-            wordDiv.innerHTML = `<span class="word-placeholder">📖 文字已隱藏，點擊「顯示生字」</span>`;
+            // 隱藏時完全清空，不顯示任何提示文字
+            wordDiv.innerHTML = ``;
             document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
         }
         const total = currentFilteredWords.length;
@@ -790,7 +790,6 @@
         stopAllSpeech();
     }
     
-    // 文章相關函數（導航按鈕已移至下方）
     function updateArticleNavButtons() {
         const prevBtn = document.getElementById("prevArticleBtn");
         const nextBtn = document.getElementById("nextArticleBtn");
