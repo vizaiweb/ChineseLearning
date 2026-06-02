@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>小二中文學習 - 識字與文章</title>
+    <!-- SheetJS 解析 Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Noto Sans CJK TC', 'PingFang TC', 'Microsoft YaHei', sans-serif;
+            background: #f0f7f0;
+            padding: 15px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 頭部 */
+        .header {
+            background: linear-gradient(135deg, #ffaa66, #ff7a3c);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 6px;
+        }
+
+        /* 控制區 */
+        .select-section {
+            padding: 18px;
+            background: #fef9e6;
+            border-bottom: 1px solid #ffe0b5;
+        }
+        .select-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .select-row label {
+            font-weight: 700;
+            color: #b45f2b;
+            min-width: 55px;
+            font-size: 16px;
+        }
+        .select-row select, .select-row input {
+            flex: 2;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1px solid #ffcd94;
+            border-radius: 40px;
+            background: white;
+            font-family: inherit;
+        }
+        .btn-filter, .tab-btn, .action-btn {
+            background: #ff914d;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 18px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .btn-filter {
+            background: #2b7e3a;
+            padding: 8px 22px;
+        }
+        .btn-filter:active, .tab-btn:active, .action-btn:active {
+            transform: scale(0.96);
+        }
+        .tab-group {
+            display: flex;
+            gap: 12px;
+            margin: 15px 0 5px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: #cfb284;
+            flex: 1;
+            text-align: center;
+        }
+        .tab-btn.active {
+            background: #ff7a3c;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        /* 學習卡片區域 */
+        .practice-card {
+            background: white;
+            padding: 24px 20px;
+            border-radius: 36px;
+            margin: 10px 15px 15px 15px;
+            box-shadow: 0 5px 12px rgba(0,0,0,0.05);
+            border: 1px solid #ffddb0;
+        }
+        .word-blank {
+            min-height: 90px;
+            font-size: 48px;
+            font-weight: bold;
+            color: #c7362b;
+            text-align: center;
+            letter-spacing: 6px;
+            margin-bottom: 12px;
+            background: #fef2e0;
+            border-radius: 32px;
+            padding: 20px 10px;
+        }
+        .meaning-area {
+            font-size: 22px;
+            background: #fff7e8;
+            padding: 14px;
+            border-radius: 28px;
+            color: #2d4a22;
+            margin: 12px 0;
+            text-align: center;
+            border-left: 8px solid #ffaa66;
+        }
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin: 18px 0 12px;
+        }
+        .btn-icon {
+            background: #ff914d;
+            border: none;
+            border-radius: 60px;
+            padding: 10px 18px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.1s;
+        }
+        .btn-icon:active {
+            transform: scale(0.96);
+        }
+        .btn-outline {
+            background: #e7e3d4;
+            color: #b45f2b;
+            border: 1px solid #ffbc7a;
+        }
+        .nav-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .progress-text {
+            text-align: center;
+            font-size: 14px;
+            color: #8b6946;
+            margin-top: 12px;
+        }
+        .show-all-btn {
+            width: 100%;
+            background: #3b7cbf;
+            margin-top: 10px;
+            border: none;
+            border-radius: 40px;
+            padding: 12px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        /* 文章區域 */
+        .article-section {
+            background: #fef5e6;
+            margin: 10px 15px 20px 15px;
+            border-radius: 32px;
+            padding: 18px;
+            border-top: 3px solid #ffb157;
+        }
+        .article-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            gap: 10px;
+        }
+        .article-title-select {
+            flex: 2;
+            padding: 10px;
+            border-radius: 40px;
+            border: 1px solid #ffbc7a;
+            font-size: 15px;
+        }
+        .article-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .article-content-box {
+            background: #fffcf0;
+            border-radius: 28px;
+            padding: 18px;
+            margin-top: 12px;
+            border: 1px solid #ffe0b0;
+            font-size: 17px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            color: #2c3a1f;
+        }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            padding: 15px;
+            color: #a0815c;
+        }
+        button:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: default;
+        }
+        @media (max-width: 550px) {
+            .btn-icon { padding: 8px 12px; font-size: 13px; }
+            .meaning-area { font-size: 18px; }
+            .word-blank { font-size: 38px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📖 小二中文樂園</h1>
+        <p>必懂寫 ✏️ ｜ 只需記認 🌟 ｜ 詩詞文章 📜</p>
+    </div>
+
+    <div class="select-section">
+        <!-- 類似 word-review 的檔案選擇 -->
+        <div class="select-row">
+            <label>📁 課本：</label>
+            <select id="fileSelect">
+                <option value="">-- 請選擇單元 --</option>
+            </select>
+        </div>
+        <!-- 日期篩選列 (Day filter) -->
+        <div class="select-row" id="dayFilterRow" style="display: none;">
+            <label>📅 日期：</label>
+            <select id="daySelect">
+                <option value="all">全部課次</option>
+                <option value="custom">自訂課次</option>
+            </select>
+            <input type="number" id="customDayNum" value="1" min="1" step="1" style="flex:1; min-width:70px;" disabled>
+            <button id="filterDayBtn" class="btn-filter">🔍 篩選</button>
+        </div>
+        <!-- 兩組生字＋文章 Tab -->
+        <div class="tab-group">
+            <button class="tab-btn active" data-tab="must">📝 必懂寫生字</button>
+            <button class="tab-btn" data-tab="only">👀 只需記認生字</button>
+            <button class="tab-btn" data-tab="article">📖 文章閱讀</button>
+        </div>
+    </div>
+
+    <!-- 生字學習區域 (必懂/記認共用) -->
+    <div id="wordPanel" style="display: block;">
+        <div class="practice-card">
+            <div class="word-blank" id="wordDisplayArea">　　</div>
+            <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
+            <div class="btn-row">
+                <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
+                <button id="readWordThreeBtn" class="btn-icon">🔊 生字讀3遍</button>
+                <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋讀1遍</button>
+            </div>
+            <div class="nav-row">
+                <button id="prevWordBtn" class="btn-icon btn-outline">⬅️ 上一個</button>
+                <button id="nextWordBtn" class="btn-icon btn-outline">➡️ 下一個</button>
+            </div>
+            <div class="progress-text" id="wordProgress"></div>
+            <button id="showAllWordsBtn" class="show-all-btn">📋 顯示所有生字</button>
+        </div>
+    </div>
+
+    <!-- 文章閱讀區域 (獨立) -->
+    <div id="articlePanel" style="display: none;">
+        <div class="article-section">
+            <div class="article-header">
+                <select id="articleSelect" class="article-title-select"></select>
+                <div class="article-buttons">
+                    <button id="readArticleBtn" class="btn-icon">🔊 讀3遍</button>
+                    <button id="stopArticleBtn" class="btn-icon">⏹️ 停止</button>
+                    <button id="toggleArticleBtn" class="btn-icon">🙈 隱藏文章</button>
+                </div>
+            </div>
+            <div id="articleContentBox" class="article-content-box">
+                請選擇文章
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        🌟 所有發音皆為粵語 | 自選課次學習 | 生字預設隱藏
+    </div>
+</div>
+
+<script>
+    // ---------- 全域變數 ----------
+    let allMustWords = [];     // 必懂寫 [{ character, explanation, example, day }]
+    let allOnlyWords = [];     // 只需記認
+    let articles = [];         // [{ title, content }]
+    
+    let currentWordSet = "must";    // "must" or "only"
+    let currentFilteredWords = [];
+    let currentWordIndex = 0;
+    let currentFileName = "";
+    
+    // 控制生字顯示隱藏狀態
+    let isWordVisible = false;
+    
+    // 文章相關
+    let currentArticleIndex = 0;
+    let isArticleHidden = false;
+    let currentSpeechUtterance = null;   // 追蹤朗讀以便停止
+    let isReadingActive = false;
+    
+    // 粵語語音引擎 (復用 word-review 邏輯)
+    let synth = window.speechSynthesis;
+    let cantoneseVoice = null;
+    let voiceReady = false;
+    
+    // ---------- 初始化語音引擎 ----------
+    function getCantoneseVoice() {
+        const voices = synth.getVoices();
+        if (!voices || voices.length === 0) return null;
+        return voices.find(v => v.lang === 'yue' || v.lang === 'zh-HK' || v.name?.includes('Ting-Ting') || v.name?.includes('Sin-Ji')) || null;
+    }
+    
+    function ensureVoice(callback) {
+        if (voiceReady && cantoneseVoice) {
+            if (callback) callback();
+            return;
+        }
+        const dummy = new SpeechSynthesisUtterance('');
+        dummy.volume = 0;
+        const voice = getCantoneseVoice();
+        if (voice) cantoneseVoice = voice;
+        dummy.onend = () => {
+            voiceReady = true;
+            if (callback) callback();
+        };
+        synth.speak(dummy);
+        setTimeout(() => {
+            if (!voiceReady) {
+                voiceReady = true;
+                if (callback) callback();
+            }
+        }, 500);
+    }
+    
+    function speakCantoneseOnce(text, onEnd) {
+        if (!text || !text.trim()) {
+            if (onEnd) onEnd();
+            return;
+        }
+        // 停止正在進行的朗讀避免重疊
+        try { synth.cancel(); } catch(e) {}
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "yue";
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        const voice = getCantoneseVoice();
+        if (voice) utterance.voice = voice;
+        let ended = false;
+        utterance.onend = () => {
+            if (!ended) { ended = true; if (onEnd) onEnd(); }
+        };
+        utterance.onerror = () => {
+            if (!ended) { ended = true; if (onEnd) onEnd(); }
+        };
+        synth.speak(utterance);
+        setTimeout(() => {
+            if (!ended) { ended = true; if (onEnd) onEnd(); }
+        }, Math.max(800, text.length * 90));
+    }
+    
+    function speakThreeTimes(text) {
+        if (!text) return;
+        let times = 0;
+        function speakNext() {
+            if (times < 3) {
+                speakCantoneseOnce(text, () => {
+                    times++;
+                    setTimeout(speakNext, 500);
+                });
+            }
+        }
+        speakNext();
+    }
+    
+    function stopAllSpeech() {
+        try { synth.cancel(); } catch(e) {}
+        isReadingActive = false;
+        if (currentSpeechUtterance) currentSpeechUtterance = null;
+    }
+    
+    // ---------- 讀取 GitHub Excel (預設放在 data/chinese/ 下，可調整路徑) ----------
+    // 檔案清單: 手動定義或者透過 fileList.json，這裡按照 word-review 模式 建立 fileList.json
+    const BASE_URL = window.location.href.includes('github.io') ? 
+        window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/') : 
+        './';
+    const DATA_PATH = `${BASE_URL}data/chinese/`;   // 存放 Excel 與 fileList.json
+    
+    // 載入檔案清單
+    async function loadFileList() {
+        try {
+            const listUrl = `${DATA_PATH}fileList.json`;
+            const res = await fetch(listUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const files = json.files || [];
+            const fileSelect = document.getElementById('fileSelect');
+            fileSelect.innerHTML = '<option value="">-- 請選擇單元 --</option>';
+            files.forEach(f => {
+                const option = document.createElement('option');
+                option.value = f;
+                option.textContent = f.replace(/\.xlsx$/i, '');
+                fileSelect.appendChild(option);
+            });
+            if (files.length > 0) fileSelect.disabled = false;
+        } catch(e) {
+            console.warn("無法讀取 fileList.json，請依照目錄結構建立 data/chinese/fileList.json", e);
+            document.getElementById('fileSelect').innerHTML = '<option value="">無法載入清單</option>';
+        }
+    }
+    
+    // 解析 Excel (三個工作表)
+    async function loadExcelFile(filename) {
+        if (!filename) return false;
+        currentFileName = filename;
+        const url = `${DATA_PATH}${filename}`;
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`下載失敗 ${resp.status}`);
+            const ab = await resp.arrayBuffer();
+            const wb = XLSX.read(ab, { type: 'array' });
+            // 工作表1: 必懂寫
+            const sheet1 = wb.Sheets["必懂寫"];
+            if (sheet1) {
+                const rows = XLSX.utils.sheet_to_json(sheet1);
+                allMustWords = rows.map(row => ({
+                    character: String(row["生字"] || "").trim(),
+                    explanation: String(row["解釋"] || "").trim(),
+                    example: String(row["例句"] || "").trim(),
+                    day: row["日期"] !== undefined ? String(row["日期"]).trim() : ""
+                })).filter(w => w.character);
+            } else allMustWords = [];
+            // 工作表2: 只需記認
+            const sheet2 = wb.Sheets["只需記認"];
+            if (sheet2) {
+                const rows = XLSX.utils.sheet_to_json(sheet2);
+                allOnlyWords = rows.map(row => ({
+                    character: String(row["生字"] || "").trim(),
+                    explanation: String(row["解釋"] || "").trim(),
+                    example: String(row["例句"] || "").trim(),
+                    day: row["日期"] !== undefined ? String(row["日期"]).trim() : ""
+                })).filter(w => w.character);
+            } else allOnlyWords = [];
+            // 工作表3: 文章 (欄位: 標題, 文章)
+            const sheet3 = wb.Sheets["文章"];
+            if (sheet3) {
+                const rows = XLSX.utils.sheet_to_json(sheet3);
+                articles = rows.map(row => ({
+                    title: String(row["標題"] || row["标题"] || "無題").trim(),
+                    content: String(row["文章"] || row["内容"] || "").trim()
+                })).filter(a => a.title && a.content);
+            } else articles = [];
+            
+            // 初始化 UI
+            if (currentWordSet === "must") refreshWordList("must");
+            else if (currentWordSet === "only") refreshWordList("only");
+            
+            // 設定文章下拉選單
+            populateArticleSelect();
+            if (articles.length > 0) showArticle(0);
+            else document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
+            
+            document.getElementById("dayFilterRow").style.display = "flex";
+            return true;
+        } catch(err) {
+            console.error(err);
+            alert("載入失敗，請確認 Excel 檔案格式及路徑正確");
+            return false;
+        }
+    }
+    
+    function refreshWordList(setType) {
+        currentWordSet = setType;
+        const sourceWords = (setType === "must") ? allMustWords : allOnlyWords;
+        // 日期篩選狀態
+        const daySelect = document.getElementById("daySelect");
+        const customNum = document.getElementById("customDayNum");
+        let filterValue = daySelect.value;
+        let dayFilter = null;
+        if (filterValue === "custom") {
+            let val = customNum.value.trim();
+            if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+        }
+        if (filterValue === "all" || !dayFilter) {
+            currentFilteredWords = [...sourceWords];
+        } else {
+            currentFilteredWords = sourceWords.filter(w => String(w.day) === dayFilter);
+        }
+        currentWordIndex = 0;
+        isWordVisible = false;
+        if (currentFilteredWords.length === 0) {
+            document.getElementById("wordDisplayArea").innerHTML = "📭 沒有符合的生字";
+            document.getElementById("meaningArea").innerHTML = "💡 嘗試調整課次篩選";
+            document.getElementById("wordProgress").innerText = "0 / 0";
+            document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
+            return;
+        }
+        renderCurrentWord();
+    }
+    
+    function renderCurrentWord() {
+        if (!currentFilteredWords.length) {
+            document.getElementById("wordDisplayArea").innerHTML = "✨ 暫無生字 ✨";
+            document.getElementById("meaningArea").innerHTML = "💡 請選擇檔案或調整篩選";
+            document.getElementById("wordProgress").innerText = "0 / 0";
+            return;
+        }
+        const w = currentFilteredWords[currentWordIndex];
+        if (!w) return;
+        // 解釋固定顯示
+        document.getElementById("meaningArea").innerHTML = `📖 ${w.explanation || "（無解釋）"}`;
+        // 生字區域控制顯示隱藏
+        const wordDiv = document.getElementById("wordDisplayArea");
+        if (isWordVisible) {
+            wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
+            document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
+        } else {
+            wordDiv.innerHTML = `<span style="opacity:0;">　</span>`;  // 完全空白無占位符
+            document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
+        }
+        const total = currentFilteredWords.length;
+        document.getElementById("wordProgress").innerHTML = `📌 第 ${currentWordIndex+1} / ${total} 字 &nbsp;| 課次: ${w.day || "—"}`;
+        // 上一頁下一頁 disabled 狀態
+        document.getElementById("prevWordBtn").disabled = (currentWordIndex === 0);
+        document.getElementById("nextWordBtn").disabled = (currentWordIndex === total-1);
+    }
+    
+    // 切換生字組
+    function switchWordSet(set) {
+        currentWordSet = set;
+        refreshWordList(set);
+        // 同步tab按鈕樣式
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        if (set === 'must') document.querySelector('[data-tab="must"]').classList.add('active');
+        else if (set === 'only') document.querySelector('[data-tab="only"]').classList.add('active');
+        // 若文章面板顯示則切換回來
+        document.getElementById("wordPanel").style.display = "block";
+        document.getElementById("articlePanel").style.display = "none";
+        stopAllSpeech();
+    }
+    
+    // 文章下拉
+    function populateArticleSelect() {
+        const select = document.getElementById("articleSelect");
+        select.innerHTML = "";
+        articles.forEach((art, idx) => {
+            const option = document.createElement("option");
+            option.value = idx;
+            option.textContent = art.title;
+            select.appendChild(option);
+        });
+        select.onchange = () => {
+            const idx = parseInt(select.value, 10);
+            if (!isNaN(idx)) showArticle(idx);
+            stopAllSpeech();
+        };
+        if (articles.length) select.value = "0";
+    }
+    
+    function showArticle(index) {
+        if (!articles.length) return;
+        currentArticleIndex = index;
+        const art = articles[currentArticleIndex];
+        document.getElementById("articleSelect").value = currentArticleIndex;
+        const contentDiv = document.getElementById("articleContentBox");
+        if (!isArticleHidden) {
+            contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
+        } else {
+            contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
+        }
+    }
+    
+    function toggleArticleVisibility() {
+        const btn = document.getElementById("toggleArticleBtn");
+        isArticleHidden = !isArticleHidden;
+        const art = articles[currentArticleIndex];
+        const contentDiv = document.getElementById("articleContentBox");
+        if (isArticleHidden) {
+            contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
+            btn.textContent = "🙉 顯示文章";
+        } else {
+            if (art) contentDiv.innerHTML = art.content.replace(/\n/g, '<br>');
+            else contentDiv.innerHTML = "無內容";
+            btn.textContent = "🙈 隱藏文章";
+        }
+    }
+    
+    function readArticleThreeTimes() {
+        if (!articles.length) return;
+        const art = articles[currentArticleIndex];
+        if (!art.content) return;
+        stopAllSpeech();
+        speakThreeTimes(art.content);
+    }
+    
+    // 顯示所有生字 (彈窗)
+    function showAllWordsPopup() {
+        const source = (currentWordSet === "must") ? allMustWords : allOnlyWords;
+        if (!source.length) {
+            alert("目前沒有生字資料");
+            return;
+        }
+        const setTitle = (currentWordSet === "must") ? "必懂寫生字表" : "只需記認生字表";
+        let tableHtml = `<table border="1" cellpadding="8" style="border-collapse:collapse; width:100%;">
+            <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
+        source.forEach(w => {
+            tableHtml += `<tr><td style="font-weight:bold;">${w.character}</td><td>${w.explanation || ''}</td><td>${w.example || ''}</td><td>${w.day || ''}</td></tr>`;
+        });
+        tableHtml += `</tbody></table>`;
+        const win = window.open("", "_blank", "width=750,height=600,scrollbars=yes");
+        if (win) {
+            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${setTitle}</title><style>body{font-family:sans-serif;padding:16px;} table{border:1px solid #ccc;} th,td{padding:8px;text-align:left;}</style></head><body><h2>📚 ${setTitle} (共${source.length}字)</h2>${tableHtml}<button onclick="window.close()" style="margin-top:20px;padding:8px 20px;">關閉</button></body></html>`);
+            win.document.close();
+        } else {
+            alert("請允許彈出視窗，以查看完整生字表");
+        }
+    }
+    
+    // 日期篩選邏輯
+    function applyDayFilter() {
+        if (!currentFileName) return;
+        refreshWordList(currentWordSet);
+    }
+    
+    // 監聽自訂日期開關
+    function initDaySelectToggle() {
+        const daySelect = document.getElementById("daySelect");
+        const customInput = document.getElementById("customDayNum");
+        daySelect.addEventListener("change", () => {
+            if (daySelect.value === "custom") {
+                customInput.disabled = false;
+                customInput.value = "1";
+            } else {
+                customInput.disabled = true;
+                customInput.value = "1";
+            }
+        });
+        customInput.disabled = true;
+        document.getElementById("filterDayBtn").addEventListener("click", applyDayFilter);
+    }
+    
+    // 綁定生字按鈕事件 (動態刷新綁定)
+    function bindWordEvents() {
+        const toggleBtn = document.getElementById("toggleWordBtn");
+        const readWord3Btn = document.getElementById("readWordThreeBtn");
+        const readMeaningBtn = document.getElementById("readMeaningBtn");
+        const prevBtn = document.getElementById("prevWordBtn");
+        const nextBtn = document.getElementById("nextWordBtn");
+        const showAllBtn = document.getElementById("showAllWordsBtn");
+        
+        toggleBtn.onclick = () => {
+            if (!currentFilteredWords.length) return;
+            isWordVisible = !isWordVisible;
+            renderCurrentWord();
+        };
+        readWord3Btn.onclick = () => {
+            if (!currentFilteredWords.length) return;
+            const w = currentFilteredWords[currentWordIndex];
+            if (w && w.character) speakThreeTimes(w.character);
+        };
+        readMeaningBtn.onclick = () => {
+            if (!currentFilteredWords.length) return;
+            const w = currentFilteredWords[currentWordIndex];
+            if (w && w.explanation) speakCantoneseOnce(w.explanation);
+        };
+        prevBtn.onclick = () => {
+            if (currentWordIndex > 0) {
+                currentWordIndex--;
+                isWordVisible = false;
+                renderCurrentWord();
+                stopAllSpeech();
+            }
+        };
+        nextBtn.onclick = () => {
+            if (currentWordIndex + 1 < currentFilteredWords.length) {
+                currentWordIndex++;
+                isWordVisible = false;
+                renderCurrentWord();
+                stopAllSpeech();
+            } else if (currentWordIndex + 1 === currentFilteredWords.length) {
+                alert("🎉 已完成本組所有生字！好厲害～");
+            }
+        };
+        showAllBtn.onclick = showAllWordsPopup;
+    }
+    
+    // 文章模塊事件
+    function bindArticleEvents() {
+        const readBtn = document.getElementById("readArticleBtn");
+        const stopBtn = document.getElementById("stopArticleBtn");
+        const toggleBtn = document.getElementById("toggleArticleBtn");
+        readBtn.onclick = () => { readArticleThreeTimes(); };
+        stopBtn.onclick = () => { stopAllSpeech(); };
+        toggleBtn.onclick = () => { toggleArticleVisibility(); };
+    }
+    
+    // Tab 切換邏輯
+    function bindTabSwitching() {
+        const tabs = document.querySelectorAll(".tab-btn");
+        tabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const tab = btn.getAttribute("data-tab");
+                if (tab === "must") {
+                    switchWordSet("must");
+                } else if (tab === "only") {
+                    switchWordSet("only");
+                } else if (tab === "article") {
+                    document.getElementById("wordPanel").style.display = "none";
+                    document.getElementById("articlePanel").style.display = "block";
+                    stopAllSpeech();
+                    if (articles.length && !isArticleHidden) {
+                        const art = articles[currentArticleIndex];
+                        if (art) document.getElementById("articleContentBox").innerHTML = art.content.replace(/\n/g, '<br>');
+                    }
+                    document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
+                    btn.classList.add("active");
+                }
+            });
+        });
+    }
+    
+    // 檔案選擇監聽
+    function bindFileSelect() {
+        const fileSelect = document.getElementById("fileSelect");
+        fileSelect.addEventListener("change", async (e) => {
+            const filename = e.target.value;
+            if (!filename) return;
+            await loadExcelFile(filename);
+            // 重置顯示與隱藏狀態
+            isWordVisible = false;
+            if (currentWordSet !== "article") {
+                document.getElementById("wordPanel").style.display = "block";
+                document.getElementById("articlePanel").style.display = "none";
+                refreshWordList(currentWordSet);
+            } else {
+                document.getElementById("wordPanel").style.display = "none";
+                document.getElementById("articlePanel").style.display = "block";
+            }
+        });
+    }
+    
+    // 主初始化
+    window.addEventListener("DOMContentLoaded", async () => {
+        await loadFileList();
+        bindFileSelect();
+        bindWordEvents();
+        bindArticleEvents();
+        bindTabSwitching();
+        initDaySelectToggle();
+        ensureVoice(() => { console.log("粵語語音就緒"); });
+        // 預設面板
+        document.getElementById("wordPanel").style.display = "block";
+        document.getElementById("articlePanel").style.display = "none";
+        // 若沒有文章則隱藏文章相關提示可忽略
+    });
+</script>
+</body>
+</html>
