@@ -137,22 +137,18 @@
             border-left: 4px solid #ffaa66;
             box-shadow: none;
         }
-        /* 按鈕列：左右分佈 */
-        .btn-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
+        /* 新版按鈕區域：使用 CSS Grid 實現精確比例 */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
             gap: 12px;
             margin: 18px 0 12px;
         }
-        .btn-left {
-            display: flex;
-            gap: 12px;
-        }
-        .btn-right {
-            display: flex;
-            gap: 12px;
+        .btn-grid .btn-icon {
+            width: 100%;
+            justify-content: center;
+            padding: 10px 5px;
+            white-space: nowrap;
         }
         /* 導航列：兩個按鈕平均佔滿整行 */
         .nav-row {
@@ -282,8 +278,8 @@
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
             .word-blank { font-size: 38px; }
-            .btn-row { flex-direction: column; align-items: stretch; }
-            .btn-left, .btn-right { justify-content: center; }
+            .btn-grid { gap: 8px; }
+            .btn-grid .btn-icon { white-space: normal; font-size: 12px; }
             .nav-btn { padding: 10px 5px; font-size: 14px; }
         }
     </style>
@@ -321,14 +317,11 @@
         <div class="practice-card">
             <div class="word-blank" id="wordDisplayArea"></div>
             <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
-            <div class="btn-row">
-                <div class="btn-left">
-                    <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
-                </div>
-                <div class="btn-right">
-                    <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
-                    <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
-                </div>
+            <!-- 按鈕區域：左邊 1/2，右邊各 1/4 使用 grid 布局 -->
+            <div class="btn-grid">
+                <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
+                <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
+                <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
             </div>
             <!-- 導航按鈕：兩個按鈕平均佔滿整行 -->
             <div class="nav-row">
@@ -901,7 +894,7 @@
         }
         const setTitle = (currentWordSet === "must") ? "必懂寫生字表" : "只需記認生字表";
         let tableHtml = `<table border="1" cellpadding="8" style="border-collapse:collapse; width:100%;">
-            <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th><tr></thead><tbody>`;
+            <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
         source.forEach(w => {
             tableHtml += `<tr><td style="font-weight:bold;">${w.character}</td><td>${w.explanation || ''}</td><td>${w.example || ''}</td><td>${w.day || ''}</td></tr>`;
         });
