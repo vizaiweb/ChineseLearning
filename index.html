@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>小二中文學習 - 識字與文章</title>
+    <title>小學中文學習 - 識字與文章</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
@@ -37,11 +37,6 @@
         .header h1 {
             font-size: 28px;
             letter-spacing: 2px;
-        }
-        .header p {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-top: 6px;
         }
 
         .select-section {
@@ -119,6 +114,7 @@
             box-shadow: 0 5px 12px rgba(0,0,0,0.05);
             border: 1px solid #ffddb0;
         }
+        /* 生字區域與解釋區域使用相同背景 */
         .word-blank {
             min-height: 90px;
             font-size: 48px;
@@ -133,7 +129,7 @@
         }
         .meaning-area {
             font-size: 22px;
-            background: #fff7e8;
+            background: #fef2e0;      /* 與生字區域背景相同 */
             padding: 14px;
             border-radius: 28px;
             color: #2d4a22;
@@ -253,6 +249,13 @@
             opacity: 0.6;
             cursor: wait;
         }
+        /* 生字隱藏時的淺灰色提示 */
+        .word-placeholder {
+            color: #b0a07c;
+            font-size: 28px;
+            font-weight: normal;
+            letter-spacing: normal;
+        }
         @media (max-width: 550px) {
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
@@ -265,8 +268,8 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>📖 小二中文樂園</h1>
-        <p>必懂寫 ✏️ ｜ 只需記認 🌟 ｜ 詩詞文章 📜</p>
+        <h1>📖 小學中文樂園</h1>
+        <!-- 已移除副標題 -->
     </div>
 
     <div class="select-section">
@@ -452,7 +455,7 @@
         }
     }
     
-    // 朗讀一次（文章專用，帶按鈕狀態，可中斷）
+    // 朗讀一次（文章專用）
     function speakArticleOnce(text, buttonElement) {
         if (!text) return;
         
@@ -496,7 +499,7 @@
         });
     }
     
-    // 朗讀三次（生字專用）
+    // 朗讀三次（生字）
     function speakThreeTimes(text, buttonElement = null) {
         if (!text) return;
         
@@ -560,7 +563,7 @@
         ensureCantoneseEngine(readNext);
     }
     
-    // 朗讀一次（解釋專用）
+    // 朗讀一次（解釋）
     function speakExplanationOnce(text, buttonElement) {
         if (!text) return;
         
@@ -697,7 +700,6 @@
             if (currentWordSet === "must") refreshWordList("must");
             else if (currentWordSet === "only") refreshWordList("only");
             
-            // 更新文章顯示
             if (articles.length > 0) {
                 currentArticleIndex = 0;
                 updateArticleNavButtons();
@@ -760,7 +762,8 @@
             wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
             document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
         } else {
-            wordDiv.innerHTML = `<span style="opacity:0;">　</span>`;
+            // 隱藏時顯示淺灰色「中文生字」提示
+            wordDiv.innerHTML = `<span class="word-placeholder">中文生字</span>`;
             document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
         }
         const total = currentFilteredWords.length;
@@ -815,7 +818,6 @@
             currentArticleIndex--;
             showArticle(currentArticleIndex);
             stopAllSpeech();
-            // 如果文章是隱藏狀態，切換後仍然隱藏，但需更新內容區域
             const contentDiv = document.getElementById("articleContentBox");
             if (isArticleHidden) {
                 contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
