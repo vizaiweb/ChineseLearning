@@ -114,7 +114,7 @@
             box-shadow: 0 5px 12px rgba(0,0,0,0.05);
             border: 1px solid #ffddb0;
         }
-        /* 生字區域與解釋區域使用相同背景 */
+        /* 生字區域與解釋區域使用相同背景，無立體陰影 */
         .word-blank {
             min-height: 90px;
             font-size: 48px;
@@ -135,7 +135,9 @@
             color: #2d4a22;
             margin: 12px 0;
             text-align: center;
-            border-left: 8px solid #ffaa66;
+            /* 移除陰影效果：去掉 border-left 立體感，改用純色邊框 */
+            border-left: 4px solid #ffaa66;
+            box-shadow: none;
         }
         .btn-row {
             display: flex;
@@ -196,6 +198,7 @@
             padding: 18px;
             border-top: 3px solid #ffb157;
         }
+        /* 文章標題區塊：只放標題和按鈕，導航移到下方 */
         .article-header {
             display: flex;
             align-items: center;
@@ -203,12 +206,6 @@
             flex-wrap: wrap;
             margin-bottom: 12px;
             gap: 10px;
-        }
-        .article-nav {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 2;
         }
         .article-title-display {
             font-size: 18px;
@@ -227,12 +224,22 @@
             border-radius: 28px;
             padding: 18px;
             margin-top: 12px;
+            margin-bottom: 16px;
             border: 1px solid #ffe0b0;
             font-size: 17px;
             line-height: 1.65;
             white-space: pre-wrap;
             word-break: break-word;
             color: #2c3a1f;
+        }
+        /* 文章導航按鈕容器：放在內容框下方 */
+        .article-nav-footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 8px;
+            margin-bottom: 4px;
         }
         .footer {
             text-align: center;
@@ -249,19 +256,19 @@
             opacity: 0.6;
             cursor: wait;
         }
-        /* 生字隱藏時的淺灰色提示 */
+        /* 生字隱藏時的提示樣式：與文章隱藏提示完全一致 */
         .word-placeholder {
-            color: #b0a07c;
-            font-size: 28px;
+            font-size: 1.2rem;
+            color: #7a6a5a;
             font-weight: normal;
             letter-spacing: normal;
+            background: transparent;
+            display: inline-block;
         }
         @media (max-width: 550px) {
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
             .word-blank { font-size: 38px; }
-            .article-nav { flex-wrap: wrap; justify-content: center; }
-            .article-title-display { order: -1; width: 100%; }
         }
     </style>
 </head>
@@ -269,7 +276,6 @@
 <div class="container">
     <div class="header">
         <h1>📖 小學中文樂園</h1>
-        <!-- 已移除副標題 -->
     </div>
 
     <div class="select-section">
@@ -301,8 +307,8 @@
             <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
             <div class="btn-row">
                 <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
-                <button id="readWordThreeBtn" class="btn-icon">🔊 生字讀3遍</button>
-                <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋讀1遍</button>
+                <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
+                <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
             </div>
             <div class="nav-row">
                 <button id="prevWordBtn" class="btn-icon btn-outline">⬅️ 上一個</button>
@@ -316,11 +322,7 @@
     <div id="articlePanel" style="display: none;">
         <div class="article-section">
             <div class="article-header">
-                <div class="article-nav">
-                    <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 14px;">⬅️ 上一篇</button>
-                    <span id="articleTitleDisplay" class="article-title-display">請選擇文章</span>
-                    <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 14px;">下一篇 ➡️</button>
-                </div>
+                <span id="articleTitleDisplay" class="article-title-display">請選擇文章</span>
                 <div class="article-buttons">
                     <button id="readArticleBtn" class="btn-icon">🔊 朗讀</button>
                     <button id="toggleArticleBtn" class="btn-icon">🙈 隱藏文章</button>
@@ -328,6 +330,11 @@
             </div>
             <div id="articleContentBox" class="article-content-box">
                 請選擇文章
+            </div>
+            <!-- 文章導航按鈕：放在文字框下方 -->
+            <div class="article-nav-footer">
+                <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">⬅️ 上一篇</button>
+                <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">下一篇 ➡️</button>
             </div>
         </div>
     </div>
@@ -499,7 +506,7 @@
         });
     }
     
-    // 朗讀三次（生字）
+    // 朗讀三次（生字專用）按鈕文字改為 "🔊 生字x3"
     function speakThreeTimes(text, buttonElement = null) {
         if (!text) return;
         
@@ -509,7 +516,7 @@
             isCantoneseReading = false;
             if (currentCantoneseButton) {
                 if (currentCantoneseButton.id === 'readWordThreeBtn') {
-                    currentCantoneseButton.textContent = "🔊 生字讀3遍";
+                    currentCantoneseButton.textContent = "🔊 生字x3";
                 }
                 currentCantoneseButton.classList.remove('reading-disabled');
                 currentCantoneseButton = null;
@@ -536,7 +543,7 @@
             if (!isCantoneseReading) return;
             if (timesRead >= 3) {
                 if (currentCantoneseButton) {
-                    currentCantoneseButton.textContent = "🔊 生字讀3遍";
+                    currentCantoneseButton.textContent = "🔊 生字x3";
                     currentCantoneseButton.classList.remove('reading-disabled');
                     currentCantoneseButton = null;
                 }
@@ -550,7 +557,7 @@
                     readingTimeout = setTimeout(readNext, 500);
                 } else if (timesRead >= 3) {
                     if (currentCantoneseButton) {
-                        currentCantoneseButton.textContent = "🔊 生字讀3遍";
+                        currentCantoneseButton.textContent = "🔊 生字x3";
                         currentCantoneseButton.classList.remove('reading-disabled');
                         currentCantoneseButton = null;
                     }
@@ -563,7 +570,7 @@
         ensureCantoneseEngine(readNext);
     }
     
-    // 朗讀一次（解釋）
+    // 朗讀一次（解釋專用）按鈕文字改為 "🗣️ 解釋x1"
     function speakExplanationOnce(text, buttonElement) {
         if (!text) return;
         
@@ -572,7 +579,7 @@
             if (readingTimeout) clearTimeout(readingTimeout);
             isCantoneseReading = false;
             if (currentCantoneseButton) {
-                currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
+                currentCantoneseButton.textContent = "🗣️ 解釋x1";
                 currentCantoneseButton.classList.remove('reading-disabled');
                 currentCantoneseButton = null;
             }
@@ -596,7 +603,7 @@
             if (!isCantoneseReading) return;
             speakCantoneseOnce(text, () => {
                 if (currentCantoneseButton) {
-                    currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
+                    currentCantoneseButton.textContent = "🗣️ 解釋x1";
                     currentCantoneseButton.classList.remove('reading-disabled');
                     currentCantoneseButton = null;
                 }
@@ -613,9 +620,9 @@
             if (readingTimeout) clearTimeout(readingTimeout);
             if (currentCantoneseButton) {
                 if (currentCantoneseButton.id === 'readWordThreeBtn') {
-                    currentCantoneseButton.textContent = "🔊 生字讀3遍";
+                    currentCantoneseButton.textContent = "🔊 生字x3";
                 } else if (currentCantoneseButton.id === 'readMeaningBtn') {
-                    currentCantoneseButton.textContent = "🗣️ 解釋讀1遍";
+                    currentCantoneseButton.textContent = "🗣️ 解釋x1";
                 } else if (currentCantoneseButton.id === 'readArticleBtn') {
                     currentCantoneseButton.textContent = "🔊 朗讀";
                 }
@@ -762,8 +769,8 @@
             wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
             document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
         } else {
-            // 隱藏時顯示淺灰色「中文生字」提示
-            wordDiv.innerHTML = `<span class="word-placeholder">中文生字</span>`;
+            // 隱藏時顯示與文章隱藏相同樣式的提示，文字改為「📖 文字已隱藏，點擊「顯示生字」」
+            wordDiv.innerHTML = `<span class="word-placeholder">📖 文字已隱藏，點擊「顯示生字」</span>`;
             document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
         }
         const total = currentFilteredWords.length;
@@ -783,7 +790,7 @@
         stopAllSpeech();
     }
     
-    // 文章相關函數
+    // 文章相關函數（導航按鈕已移至下方）
     function updateArticleNavButtons() {
         const prevBtn = document.getElementById("prevArticleBtn");
         const nextBtn = document.getElementById("nextArticleBtn");
