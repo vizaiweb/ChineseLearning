@@ -1,6 +1,8 @@
 {
-  "files": ["P2T3_Chapter9.xlsx"]
-  "files": ["P2T3_Chapter10.xlsx"]
-  "files": ["P2T3_Chapter11.xlsx"]
-  "files": ["P2T3_Chapter12.xlsx"]
+  "files": [
+    "P2T3_Chapter9.xlsx",
+    "P2T3_Chapter10.xlsx",
+    "P2T3_Chapter11.xlsx",
+    "P2T3_Chapter12.xlsx"
+  ]
 }
