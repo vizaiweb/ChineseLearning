@@ -137,7 +137,6 @@
             border-left: 4px solid #ffaa66;
             box-shadow: none;
         }
-        /* 新版按鈕區域：使用 CSS Grid 實現精確比例 */
         .btn-grid {
             display: grid;
             grid-template-columns: 2fr 1fr 1fr;
@@ -150,7 +149,6 @@
             padding: 10px 5px;
             white-space: nowrap;
         }
-        /* 導航列：兩個按鈕平均佔滿整行 */
         .nav-row {
             display: flex;
             gap: 15px;
@@ -274,6 +272,97 @@
             opacity: 0.6;
             cursor: wait;
         }
+        /* 選擇題彈窗專用樣式 (保持與原風格一致) */
+        .quiz-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 15px;
+        }
+        .quiz-table th {
+            background: #ffcd94;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 700;
+            color: #2d1f0c;
+            border: 1px solid #e0b87a;
+        }
+        .quiz-table td {
+            padding: 10px 8px;
+            border: 1px solid #e0b87a;
+            vertical-align: middle;
+            background: #fffcf0;
+        }
+        .quiz-table .correct {
+            background: #d4edda;
+        }
+        .quiz-table .wrong {
+            background: #f8d7da;
+        }
+        .quiz-table select {
+            padding: 4px 6px;
+            border-radius: 20px;
+            border: 1px solid #ffcd94;
+            background: white;
+            font-size: 14px;
+            width: 100%;
+            max-width: 100px;
+        }
+        .quiz-stats {
+            font-size: 16px;
+            color: #b45f2b;
+            margin: 8px 0 12px 0;
+            font-weight: 600;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .quiz-mode-btn {
+            background: #ffaa66;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 20px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.1s;
+        }
+        .quiz-mode-btn:active {
+            transform: scale(0.96);
+        }
+        .quiz-close-btn {
+            background: #b0a090;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 24px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.1s;
+        }
+        .quiz-close-btn:active {
+            transform: scale(0.96);
+        }
+        .quiz-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #ffe0b0;
+        }
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
         @media (max-width: 550px) {
             .btn-icon { padding: 8px 12px; font-size: 13px; }
             .meaning-area { font-size: 18px; }
@@ -281,6 +370,9 @@
             .btn-grid { gap: 8px; }
             .btn-grid .btn-icon { white-space: normal; font-size: 12px; }
             .nav-btn { padding: 10px 5px; font-size: 14px; }
+            .quiz-table { font-size: 13px; }
+            .quiz-table th, .quiz-table td { padding: 6px 4px; }
+            .quiz-table select { font-size: 12px; max-width: 70px; }
         }
     </style>
 </head>
@@ -317,13 +409,11 @@
         <div class="practice-card">
             <div class="word-blank" id="wordDisplayArea"></div>
             <div class="meaning-area" id="meaningArea">💡 解釋將會顯示在這裡</div>
-            <!-- 按鈕區域：左邊 1/2，右邊各 1/4 使用 grid 布局 -->
             <div class="btn-grid">
                 <button id="toggleWordBtn" class="btn-icon">👁️ 顯示生字</button>
                 <button id="readWordThreeBtn" class="btn-icon">🔊 生字x3</button>
                 <button id="readMeaningBtn" class="btn-icon">🗣️ 解釋x1</button>
             </div>
-            <!-- 導航按鈕：兩個按鈕平均佔滿整行 -->
             <div class="nav-row">
                 <button id="prevWordBtn" class="nav-btn">⬅️ 上一個</button>
                 <button id="nextWordBtn" class="nav-btn">➡️ 下一個</button>
@@ -886,6 +976,224 @@
         speakArticleOnce(art.content, button);
     }
     
+    // ====================== 【新增】選擇題模式核心函數 ======================
+    // 儲存當前選擇題資料 (用於返回列表時保留)
+    let currentQuizData = null;
+    let currentQuizMode = 'list'; // 'list' 或 'quiz'
+    
+    // 生成選擇題資料 (每次重新生成)
+    function generateQuizData(wordList) {
+        if (!wordList || wordList.length === 0) return null;
+        const quizItems = [];
+        const total = wordList.length;
+        // 複製一份用於隨機抽取幹擾項
+        const allChars = wordList.map(w => w.character);
+        
+        for (let i = 0; i < total; i++) {
+            const correct = wordList[i];
+            // 抽取兩個不同的幹擾項
+            let distractors = [];
+            const candidates = allChars.filter(ch => ch !== correct.character);
+            // 如果候選字少於2個，則使用重複字（但這種情況極少）
+            if (candidates.length < 2) {
+                // 若只有1個或0個候選，用自身填充（但不會發生在正常詞庫）
+                while (distractors.length < 2) {
+                    distractors.push(candidates.length > 0 ? candidates[0] : correct.character);
+                }
+            } else {
+                // 隨機抽取2個不同幹擾項
+                const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+                distractors = shuffled.slice(0, 2);
+            }
+            
+            // 建立選項陣列：正確答案 + 2個幹擾項
+            const options = [
+                { text: correct.character, isCorrect: true },
+                { text: distractors[0], isCorrect: false },
+                { text: distractors[1], isCorrect: false }
+            ];
+            // 隨機排序選項 (A, B, C 順序隨機)
+            const shuffledOptions = options.sort(() => Math.random() - 0.5);
+            // 找出正確答案的字母
+            let correctLetter = '';
+            const letters = ['A', 'B', 'C'];
+            for (let idx = 0; idx < shuffledOptions.length; idx++) {
+                if (shuffledOptions[idx].isCorrect) {
+                    correctLetter = letters[idx];
+                    break;
+                }
+            }
+            
+            quizItems.push({
+                index: i,
+                explanation: correct.explanation || '',
+                correctChar: correct.character,
+                correctLetter: correctLetter,
+                options: shuffledOptions.map((opt, idx) => ({
+                    letter: letters[idx],
+                    text: opt.text,
+                    isCorrect: opt.isCorrect
+                })),
+                userAnswer: null, // null 表示未選
+                isAnswered: false
+            });
+        }
+        return quizItems;
+    }
+    
+    // 渲染選擇題表格 (在彈窗內)
+    function renderQuizTable(quizItems, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!quizItems || quizItems.length === 0) {
+            container.innerHTML = '<p style="color:#b45f2b; text-align:center; padding:20px;">⚠️ 沒有生字資料，無法生成選擇題。</p>';
+            return;
+        }
+        
+        let total = quizItems.length;
+        let answered = quizItems.filter(item => item.isAnswered).length;
+        let correctCount = quizItems.filter(item => item.isAnswered && item.userAnswer === item.correctLetter).length;
+        let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
+        
+        let html = `
+            <div class="quiz-stats">
+                <span>📊 總題數：${total}</span>
+                <span>✅ 已答：${answered}</span>
+                <span>🎯 正確率：${accuracy}%</span>
+            </div>
+            <table class="quiz-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px;">題號</th>
+                        <th>解釋</th>
+                        <th style="width:80px;">選項 A</th>
+                        <th style="width:80px;">選項 B</th>
+                        <th style="width:80px;">選項 C</th>
+                        <th style="width:110px;">你的答案</th>
+                        <th style="width:90px;">結果</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        for (let i = 0; i < quizItems.length; i++) {
+            const item = quizItems[i];
+            const options = item.options;
+            const optionA = options.find(o => o.letter === 'A');
+            const optionB = options.find(o => o.letter === 'B');
+            const optionC = options.find(o => o.letter === 'C');
+            
+            // 判斷該列狀態
+            let rowClass = '';
+            let resultDisplay = '';
+            if (item.isAnswered) {
+                const isCorrect = item.userAnswer === item.correctLetter;
+                if (isCorrect) {
+                    rowClass = 'correct';
+                    resultDisplay = '✅';
+                } else {
+                    rowClass = 'wrong';
+                    resultDisplay = `❌ (${item.correctLetter})`;
+                }
+            }
+            
+            html += `
+                <tr class="${rowClass}" data-index="${i}">
+                    <td style="text-align:center; font-weight:bold;">${i + 1}</td>
+                    <td>${item.explanation}</td>
+                    <td>${optionA ? optionA.text : ''}</td>
+                    <td>${optionB ? optionB.text : ''}</td>
+                    <td>${optionC ? optionC.text : ''}</td>
+                    <td>
+                        <select class="quiz-select" data-index="${i}">
+                            <option value="">請揀選</option>
+                            <option value="A" ${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
+                            <option value="B" ${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
+                            <option value="C" ${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
+                        </select>
+                    </td>
+                    <td style="text-align:center; font-weight:bold;">${resultDisplay}</td>
+                </tr>
+            `;
+        }
+        
+        html += `
+                </tbody>
+            </table>
+        `;
+        
+        container.innerHTML = html;
+        
+        // 綁定下拉選單事件
+        document.querySelectorAll('.quiz-select').forEach(select => {
+            select.addEventListener('change', function(e) {
+                const index = parseInt(this.dataset.index, 10);
+                const value = this.value;
+                if (!value) return; // 請揀選不處理
+                // 更新資料
+                if (currentQuizData && currentQuizData[index]) {
+                    currentQuizData[index].userAnswer = value;
+                    currentQuizData[index].isAnswered = true;
+                }
+                // 重新渲染表格 (更新統計和結果)
+                renderQuizTable(currentQuizData, 'quizContainer');
+                // 重新附加監聽器 (已在 renderQuizTable 中處理)
+            });
+        });
+    }
+    
+    // 切換模式：列表 ↔ 選擇題
+    function switchQuizMode(mode) {
+        if (!currentQuizData) return;
+        currentQuizMode = mode;
+        const container = document.getElementById('quizContainer');
+        const listContainer = document.getElementById('wordListContainer');
+        const quizTitle = document.getElementById('quizTitle');
+        const modeToggleBtn = document.getElementById('modeToggleBtn');
+        
+        if (mode === 'list') {
+            // 顯示列表，隱藏選擇題
+            listContainer.style.display = 'block';
+            container.style.display = 'none';
+            if (quizTitle) quizTitle.textContent = '📚 生字列表';
+            if (modeToggleBtn) {
+                modeToggleBtn.textContent = '📝 選擇題';
+                modeToggleBtn.onclick = () => switchQuizMode('quiz');
+            }
+        } else {
+            // 顯示選擇題，隱藏列表
+            listContainer.style.display = 'none';
+            container.style.display = 'block';
+            if (quizTitle) quizTitle.textContent = '📝 選擇題練習';
+            if (modeToggleBtn) {
+                modeToggleBtn.textContent = '📋 返回列表';
+                modeToggleBtn.onclick = () => switchQuizMode('list');
+            }
+            // 重新生成選擇題 (每次進入選擇題模式都重新生成)
+            if (currentQuizData) {
+                // 重新生成 (基於當前詞彙列表)
+                const source = (currentWordSet === "must") ? allMustWords : allOnlyWords;
+                // 應用課次篩選
+                const daySelect = document.getElementById('daySelect');
+                const customNum = document.getElementById('customDayNum');
+                let dayFilter = null;
+                if (daySelect.value === 'custom') {
+                    let val = customNum.value.trim();
+                    if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                }
+                let filteredSource = [];
+                if (daySelect.value === 'all' || !dayFilter) {
+                    filteredSource = [...source];
+                } else {
+                    filteredSource = source.filter(w => String(w.day) === dayFilter);
+                }
+                currentQuizData = generateQuizData(filteredSource);
+                renderQuizTable(currentQuizData, 'quizContainer');
+            }
+        }
+    }
+    
+    // 修改 showAllWordsPopup 函數 (新增選擇題功能)
     function showAllWordsPopup() {
         const source = (currentWordSet === "must") ? allMustWords : allOnlyWords;
         if (!source.length) {
@@ -893,21 +1201,344 @@
             return;
         }
         const setTitle = (currentWordSet === "must") ? "必懂寫生字表" : "只需記認生字表";
+        
+        // 套用課次篩選
+        const daySelect = document.getElementById('daySelect');
+        const customNum = document.getElementById('customDayNum');
+        let dayFilter = null;
+        if (daySelect.value === 'custom') {
+            let val = customNum.value.trim();
+            if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+        }
+        let filteredSource = [];
+        if (daySelect.value === 'all' || !dayFilter) {
+            filteredSource = [...source];
+        } else {
+            filteredSource = source.filter(w => String(w.day) === dayFilter);
+        }
+        
+        if (!filteredSource.length) {
+            alert("目前沒有符合課次篩選的生字資料");
+            return;
+        }
+        
+        // 生成選擇題資料 (每次點擊「顯示所有生字」都重新生成)
+        currentQuizData = generateQuizData(filteredSource);
+        currentQuizMode = 'list'; // 預設顯示列表
+        
+        // 建立生字列表 HTML (原有)
         let tableHtml = `<table border="1" cellpadding="8" style="border-collapse:collapse; width:100%;">
             <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
-        source.forEach(w => {
+        filteredSource.forEach(w => {
             tableHtml += `<tr><td style="font-weight:bold;">${w.character}</td><td>${w.explanation || ''}</td><td>${w.example || ''}</td><td>${w.day || ''}</td></tr>`;
         });
         tableHtml += `</tbody></table>`;
-        const win = window.open("", "_blank", "width=750,height=600,scrollbars=yes");
+        
+        // 建立完整彈窗 HTML (包含列表和選擇題兩個容器，以及切換按鈕)
+        const popupHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${setTitle}</title>
+                <style>
+                    body { font-family: 'Segoe UI', 'Noto Sans CJK TC', sans-serif; padding: 20px; background: #f8f4ec; }
+                    .popup-container { max-width: 900px; margin: 0 auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+                    .popup-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
+                    .popup-header h2 { margin: 0; color: #b45f2b; }
+                    .popup-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+                    .btn-toggle { background: #ffaa66; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
+                    .btn-toggle:active { transform: scale(0.96); }
+                    .btn-close { background: #b0a090; border: none; border-radius: 40px; padding: 8px 24px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
+                    .btn-close:active { transform: scale(0.96); }
+                    .quiz-stats { font-size: 16px; color: #b45f2b; margin: 8px 0 12px 0; font-weight: 600; display: flex; gap: 20px; flex-wrap: wrap; }
+                    .quiz-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
+                    .quiz-table th { background: #ffcd94; padding: 10px 8px; text-align: left; font-weight: 700; color: #2d1f0c; border: 1px solid #e0b87a; }
+                    .quiz-table td { padding: 10px 8px; border: 1px solid #e0b87a; vertical-align: middle; background: #fffcf0; }
+                    .quiz-table .correct { background: #d4edda; }
+                    .quiz-table .wrong { background: #f8d7da; }
+                    .quiz-table select { padding: 4px 6px; border-radius: 20px; border: 1px solid #ffcd94; background: white; font-size: 14px; width: 100%; max-width: 100px; }
+                    .quiz-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #ffe0b0; }
+                    .word-list-container { margin-top: 10px; }
+                    .word-list-container table { border-collapse: collapse; width: 100%; }
+                    .word-list-container th { background: #ffcd94; padding: 8px; border: 1px solid #e0b87a; }
+                    .word-list-container td { padding: 8px; border: 1px solid #e0b87a; background: #fffcf0; }
+                    @media (max-width: 600px) {
+                        .quiz-table { font-size: 13px; }
+                        .quiz-table th, .quiz-table td { padding: 6px 4px; }
+                        .quiz-table select { font-size: 12px; max-width: 70px; }
+                        .popup-header { flex-direction: column; align-items: stretch; }
+                        .popup-controls { justify-content: space-between; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="popup-container">
+                    <div class="popup-header">
+                        <div>
+                            <h2 id="quizTitle">📚 生字列表</h2>
+                            <div style="font-size:14px; color:#8b6946; margin-top:4px;">共 ${filteredSource.length} 字</div>
+                        </div>
+                        <div class="popup-controls">
+                            <button id="modeToggleBtn" class="btn-toggle">📝 選擇題</button>
+                            <button class="btn-close" onclick="window.close()">❌ 關閉</button>
+                        </div>
+                    </div>
+                    <div id="wordListContainer" class="word-list-container">
+                        ${tableHtml}
+                    </div>
+                    <div id="quizContainer" style="display:none;"></div>
+                    <div class="quiz-footer">
+                        <button id="modeToggleFooterBtn" class="btn-toggle">📝 選擇題</button>
+                        <button class="btn-close" onclick="window.close()">❌ 關閉</button>
+                    </div>
+                </div>
+                <script>
+                    // 傳遞資料到彈窗
+                    window.quizData = ${JSON.stringify(currentQuizData)};
+                    window.currentWordSet = "${currentWordSet}";
+                    window.allMustWords = ${JSON.stringify(allMustWords)};
+                    window.allOnlyWords = ${JSON.stringify(allOnlyWords)};
+                    window.currentFilteredSource = ${JSON.stringify(filteredSource)};
+                    
+                    // 渲染選擇題函數 (複製自父頁面)
+                    function renderQuizTableInPopup(quizItems) {
+                        const container = document.getElementById('quizContainer');
+                        if (!container) return;
+                        if (!quizItems || quizItems.length === 0) {
+                            container.innerHTML = '<p style="color:#b45f2b; text-align:center; padding:20px;">⚠️ 沒有生字資料，無法生成選擇題。</p>';
+                            return;
+                        }
+                        let total = quizItems.length;
+                        let answered = quizItems.filter(item => item.isAnswered).length;
+                        let correctCount = quizItems.filter(item => item.isAnswered && item.userAnswer === item.correctLetter).length;
+                        let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
+                        
+                        let html = \`
+                            <div class="quiz-stats">
+                                <span>📊 總題數：\${total}</span>
+                                <span>✅ 已答：\${answered}</span>
+                                <span>🎯 正確率：\${accuracy}%</span>
+                            </div>
+                            <table class="quiz-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:50px;">題號</th>
+                                        <th>解釋</th>
+                                        <th style="width:80px;">選項 A</th>
+                                        <th style="width:80px;">選項 B</th>
+                                        <th style="width:80px;">選項 C</th>
+                                        <th style="width:110px;">你的答案</th>
+                                        <th style="width:90px;">結果</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        \`;
+                        for (let i = 0; i < quizItems.length; i++) {
+                            const item = quizItems[i];
+                            const options = item.options;
+                            const optionA = options.find(o => o.letter === 'A');
+                            const optionB = options.find(o => o.letter === 'B');
+                            const optionC = options.find(o => o.letter === 'C');
+                            let rowClass = '';
+                            let resultDisplay = '';
+                            if (item.isAnswered) {
+                                const isCorrect = item.userAnswer === item.correctLetter;
+                                if (isCorrect) {
+                                    rowClass = 'correct';
+                                    resultDisplay = '✅';
+                                } else {
+                                    rowClass = 'wrong';
+                                    resultDisplay = \`❌ (\${item.correctLetter})\`;
+                                }
+                            }
+                            html += \`
+                                <tr class="\${rowClass}" data-index="\${i}">
+                                    <td style="text-align:center; font-weight:bold;">\${i + 1}</td>
+                                    <td>\${item.explanation}</td>
+                                    <td>\${optionA ? optionA.text : ''}</td>
+                                    <td>\${optionB ? optionB.text : ''}</td>
+                                    <td>\${optionC ? optionC.text : ''}</td>
+                                    <td>
+                                        <select class="quiz-select" data-index="\${i}">
+                                            <option value="">請揀選</option>
+                                            <option value="A" \${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
+                                            <option value="B" \${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
+                                            <option value="C" \${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
+                                        </select>
+                                    </td>
+                                    <td style="text-align:center; font-weight:bold;">\${resultDisplay}</td>
+                                </tr>
+                            \`;
+                        }
+                        html += \`
+                                </tbody>
+                            </table>
+                        \`;
+                        container.innerHTML = html;
+                        // 綁定事件
+                        document.querySelectorAll('.quiz-select').forEach(select => {
+                            select.addEventListener('change', function(e) {
+                                const idx = parseInt(this.dataset.index, 10);
+                                const val = this.value;
+                                if (!val) return;
+                                if (window.quizData && window.quizData[idx]) {
+                                    window.quizData[idx].userAnswer = val;
+                                    window.quizData[idx].isAnswered = true;
+                                }
+                                renderQuizTableInPopup(window.quizData);
+                            });
+                        });
+                    }
+                    
+                    // 切換模式函數
+                    function switchPopupMode(mode) {
+                        const listContainer = document.getElementById('wordListContainer');
+                        const quizContainer = document.getElementById('quizContainer');
+                        const quizTitle = document.getElementById('quizTitle');
+                        const toggleBtn = document.getElementById('modeToggleBtn');
+                        const toggleFooterBtn = document.getElementById('modeToggleFooterBtn');
+                        if (mode === 'list') {
+                            listContainer.style.display = 'block';
+                            quizContainer.style.display = 'none';
+                            if (quizTitle) quizTitle.textContent = '📚 生字列表';
+                            if (toggleBtn) {
+                                toggleBtn.textContent = '📝 選擇題';
+                                toggleBtn.onclick = () => switchPopupMode('quiz');
+                            }
+                            if (toggleFooterBtn) {
+                                toggleFooterBtn.textContent = '📝 選擇題';
+                                toggleFooterBtn.onclick = () => switchPopupMode('quiz');
+                            }
+                        } else {
+                            listContainer.style.display = 'none';
+                            quizContainer.style.display = 'block';
+                            if (quizTitle) quizTitle.textContent = '📝 選擇題練習';
+                            if (toggleBtn) {
+                                toggleBtn.textContent = '📋 返回列表';
+                                toggleBtn.onclick = () => switchPopupMode('list');
+                            }
+                            if (toggleFooterBtn) {
+                                toggleFooterBtn.textContent = '📋 返回列表';
+                                toggleFooterBtn.onclick = () => switchPopupMode('list');
+                            }
+                            // 重新生成選擇題 (每次進入選擇題模式都重新生成)
+                            const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
+                            // 套用課次篩選 (從父頁面讀取)
+                            const daySelect = parent.document.getElementById('daySelect');
+                            const customNum = parent.document.getElementById('customDayNum');
+                            let dayFilter = null;
+                            if (daySelect) {
+                                if (daySelect.value === 'custom') {
+                                    let val = customNum ? customNum.value.trim() : '';
+                                    if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                                }
+                            }
+                            let filtered = [];
+                            if (!dayFilter || daySelect.value === 'all') {
+                                filtered = [...source];
+                            } else {
+                                filtered = source.filter(w => String(w.day) === dayFilter);
+                            }
+                            window.quizData = generateQuizData(filtered);
+                            renderQuizTableInPopup(window.quizData);
+                        }
+                    }
+                    
+                    // 生成選擇題資料 (複製自父頁面)
+                    function generateQuizData(wordList) {
+                        if (!wordList || wordList.length === 0) return null;
+                        const quizItems = [];
+                        const total = wordList.length;
+                        const allChars = wordList.map(w => w.character);
+                        for (let i = 0; i < total; i++) {
+                            const correct = wordList[i];
+                            let distractors = [];
+                            const candidates = allChars.filter(ch => ch !== correct.character);
+                            if (candidates.length < 2) {
+                                while (distractors.length < 2) {
+                                    distractors.push(candidates.length > 0 ? candidates[0] : correct.character);
+                                }
+                            } else {
+                                const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+                                distractors = shuffled.slice(0, 2);
+                            }
+                            const options = [
+                                { text: correct.character, isCorrect: true },
+                                { text: distractors[0], isCorrect: false },
+                                { text: distractors[1], isCorrect: false }
+                            ];
+                            const shuffledOptions = options.sort(() => Math.random() - 0.5);
+                            let correctLetter = '';
+                            const letters = ['A', 'B', 'C'];
+                            for (let idx = 0; idx < shuffledOptions.length; idx++) {
+                                if (shuffledOptions[idx].isCorrect) {
+                                    correctLetter = letters[idx];
+                                    break;
+                                }
+                            }
+                            quizItems.push({
+                                index: i,
+                                explanation: correct.explanation || '',
+                                correctChar: correct.character,
+                                correctLetter: correctLetter,
+                                options: shuffledOptions.map((opt, idx) => ({
+                                    letter: letters[idx],
+                                    text: opt.text,
+                                    isCorrect: opt.isCorrect
+                                })),
+                                userAnswer: null,
+                                isAnswered: false
+                            });
+                        }
+                        return quizItems;
+                    }
+                    
+                    // 初始化：預設顯示列表
+                    window.onload = function() {
+                        // 如果已有 quizData 則保留，否則生成
+                        if (!window.quizData) {
+                            const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
+                            // 套用課次篩選
+                            const daySelect = parent.document.getElementById('daySelect');
+                            const customNum = parent.document.getElementById('customDayNum');
+                            let dayFilter = null;
+                            if (daySelect) {
+                                if (daySelect.value === 'custom') {
+                                    let val = customNum ? customNum.value.trim() : '';
+                                    if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                                }
+                            }
+                            let filtered = [];
+                            if (!dayFilter || daySelect.value === 'all') {
+                                filtered = [...source];
+                            } else {
+                                filtered = source.filter(w => String(w.day) === dayFilter);
+                            }
+                            window.quizData = generateQuizData(filtered);
+                        }
+                        // 默認顯示列表
+                        document.getElementById('wordListContainer').style.display = 'block';
+                        document.getElementById('quizContainer').style.display = 'none';
+                        // 綁定按鈕
+                        document.getElementById('modeToggleBtn').onclick = () => switchPopupMode('quiz');
+                        document.getElementById('modeToggleFooterBtn').onclick = () => switchPopupMode('quiz');
+                    };
+                <\/script>
+            </body>
+            </html>
+        `;
+        
+        const win = window.open("", "_blank", "width=850,height=700,scrollbars=yes");
         if (win) {
-            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${setTitle}</title><style>body{font-family:sans-serif;padding:16px;} table{border:1px solid #ccc;} th,td{padding:8px;text-align:left;}</style></head><body><h2>📚 ${setTitle} (共${source.length}字)</h2>${tableHtml}<button onclick="window.close()" style="margin-top:20px;padding:8px 20px;">關閉</button></body></html>`);
+            win.document.write(popupHtml);
             win.document.close();
         } else {
             alert("請允許彈出視窗，以查看完整生字表");
         }
     }
     
+    // ====================== 保留原有函數 (未修改) ======================
     function applyDayFilter() {
         if (!currentFileName) return;
         refreshWordList(currentWordSet);
@@ -963,6 +1594,7 @@
                 alert("🎉 已完成本組所有生字！好厲害～");
             }
         };
+        // 綁定「顯示所有生字」按鈕 (使用新函數)
         document.getElementById("showAllWordsBtn").onclick = showAllWordsPopup;
     }
     
