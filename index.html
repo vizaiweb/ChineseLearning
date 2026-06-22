@@ -1363,11 +1363,27 @@ function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
                             } catch(e) { if (onEnd) onEnd(); }
                         }
 
-                        // 核心單句朗讀函數 (與父頁面相同)
-                        function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
-                            const text = \`題號\${index + 1}。\${explanation}。選項A：\${optA}，選項B：\${optB}，選項C：\${optC}。\`;
-                            speakCantoneseOnce(text, onEnd);
-                        }
+                       // 核心單句朗讀函數 (分段循序朗讀)
+function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
+    const parts = [
+        `題號${index + 1}。${explanation}`,
+        `選項A：${optA}`,
+        `選項B：${optB}`,
+        `選項C：${optC}`
+    ];
+    let currentIndex = 0;
+    function speakNext() {
+        if (currentIndex >= parts.length) {
+            if (onEnd) onEnd();
+            return;
+        }
+        speakCantoneseOnce(parts[currentIndex], () => {
+            currentIndex++;
+            speakNext();
+        });
+    }
+    speakNext();
+}
 
                         // 逐題朗讀狀態 (彈窗內獨立)
                         let quizItemReadingIndexLocal = null;
