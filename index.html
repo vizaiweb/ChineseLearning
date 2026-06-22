@@ -567,55 +567,48 @@
         }
 
         function speakCantoneseOnce(text, onEnd) {
-            if (!text || !text.trim()) {
-                if (onEnd) onEnd();
-                return;
-            }
+    if (!text || !text.trim()) {
+        if (onEnd) onEnd();
+        return;
+    }
 
-            // 如果正在朗讀，先取消之前的
-            try { synth.cancel(); } catch (e) {}
+    try { synth.cancel(); } catch (e) {}
 
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "yue";
-            utterance.rate = 0.85;
-            utterance.pitch = 1.0;
-            utterance.volume = 1;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "yue";
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1;
 
-            const voice = getCantoneseVoice();
-            if (voice) {
-                utterance.voice = voice;
-                cantoneseVoice = voice;
-            }
+    const voice = getCantoneseVoice();
+    if (voice) {
+        utterance.voice = voice;
+        cantoneseVoice = voice;
+    }
 
-            let ended = false;
+    let ended = false;
 
-            utterance.onend = () => {
-                if (!ended) {
-                    ended = true;
-                    if (onEnd) onEnd();
-                }
-            };
-
-            utterance.onerror = () => {
-                if (!ended) {
-                    ended = true;
-                    if (onEnd) onEnd();
-                }
-            };
-
-            try {
-                synth.speak(utterance);
-                // 安全計時器（僅作為異常保護，正常情況由 onend 觸發）
-                setTimeout(() => {
-                    if (!ended) {
-                        ended = true;
-                        if (onEnd) onEnd();
-                    }
-                }, Math.max(2000, text.length * 100));
-            } catch (e) {
-                if (onEnd) onEnd();
-            }
+    utterance.onend = () => {
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();  // 朗讀結束時才執行回調
         }
+    };
+
+    utterance.onerror = () => {
+        if (!ended) {
+            ended = true;
+            if (onEnd) onEnd();
+        }
+    };
+
+    try {
+        synth.speak(utterance);
+        // 移除安全計時器，完全依賴 onend 事件
+    } catch (e) {
+        if (onEnd) onEnd();
+    }
+}
 
         // ---------- 【核心】單句朗讀（共用核心） ----------
         // 朗讀單一題目 (題號 + 解釋內容 + 選項，不讀『解釋』二字)
