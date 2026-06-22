@@ -521,9 +521,6 @@
 
         // 選擇題逐題朗讀狀態管理
         let quizItemReadingIndex = null; // 當前朗讀的題目索引
-        let isQuizReadingAll = false; // 是否正在朗讀全部
-        let quizReadAllButton = null; // 朗讀全部按鈕
-        let quizReadAllCurrentIndex = 0; // 朗讀全部當前索引
 
         // ---------- 語音引擎 ----------
         function getCantoneseVoice() {
@@ -622,7 +619,6 @@
 
         // ---------- 【核心】單句朗讀（共用核心） ----------
         // 朗讀單一題目 (題號 + 解釋內容 + 選項，不讀『解釋』二字)
-        // 這是單句朗讀和朗讀全部共用的核心函數
         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
             const text =
                 `題號${index + 1}。${explanation}。選項A：${optA}，選項B：${optB}，選項C：${optC}。`;
@@ -656,17 +652,6 @@
                     if (btn.textContent !== '🔊') btn.textContent = '🔊';
                 });
             } catch (e) {}
-            // 重置「朗讀全部」按鈕文字
-            try {
-                const readAllBtn = document.querySelector('.quiz-read-all-btn');
-                if (readAllBtn && readAllBtn.textContent !== '🔊 朗讀全部題目') {
-                    readAllBtn.textContent = '🔊 朗讀全部題目';
-                }
-            } catch (e) {}
-            // 重置朗讀全部狀態
-            isQuizReadingAll = false;
-            quizReadAllButton = null;
-            quizReadAllCurrentIndex = 0;
         }
 
         setTimeout(() => {
@@ -987,30 +972,8 @@
         }
 
         // ---------- 【核心】逐題朗讀（單句朗讀） ----------
-        // 這是單句朗讀的核心實現，朗讀全部也透過此函數來執行
         function toggleSingleQuizReading(index, buttonElement) {
             if (!currentQuizData || index >= currentQuizData.length) return;
-
-            // 如果正在朗讀全部，先停止
-            if (isQuizReadingAll) {
-                stopAllSpeech();
-                if (quizReadAllButton) {
-                    quizReadAllButton.textContent = "🔊 朗讀全部題目";
-                }
-                // 重置朗讀全部狀態
-                isQuizReadingAll = false;
-                quizReadAllButton = null;
-                quizReadAllCurrentIndex = 0;
-                // 重置所有逐題按鈕
-                document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                    if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                });
-                // 如果按的就是正在朗讀的那題，直接返回
-                if (quizItemReadingIndex === index) {
-                    quizItemReadingIndex = null;
-                    return;
-                }
-            }
 
             // 如果該題正在朗讀 → 停止
             if (quizItemReadingIndex === index && isCantoneseReading) {
@@ -1049,105 +1012,6 @@
             );
         }
 
-        // ---------- 【核心】朗讀全部（排程器） ----------
-        // 採用與單句朗讀完全相同的核心函數 speakSingleQuizItem
-        // 只是按順序呼叫，並在每題完成後自動進入下一題
-        function toggleQuizReadAll(quizData, buttonElement) {
-            if (!quizData || quizData.length === 0) return;
-
-            // 如果正在朗讀全部且是同一按鈕 → 停止
-            if (isQuizReadingAll && quizReadAllButton === buttonElement) {
-                stopAllSpeech();
-                // stopAllSpeech 會重置所有狀態，包括 isQuizReadingAll
-                // 但需要額外確保按鈕文字被重置
-                buttonElement.textContent = "🔊 朗讀全部題目";
-                return;
-            }
-
-            // 停止任何正在進行的朗讀
-            stopAllSpeech();
-
-            // 重置所有逐題按鈕
-            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                if (btn.textContent !== '🔊') btn.textContent = '🔊';
-            });
-
-            // 設定朗讀全部狀態
-            isQuizReadingAll = true;
-            quizReadAllButton = buttonElement;
-            quizReadAllCurrentIndex = 0;
-            buttonElement.textContent = "⏹️ 停止";
-
-            // 開始朗讀第一題
-            speakNextQuizItem();
-        }
-
-        // 朗讀全部的核心排程函數
-        function speakNextQuizItem() {
-            // 檢查是否被中斷
-            if (!isQuizReadingAll) {
-                // 如果被中斷，重置按鈕
-                if (quizReadAllButton) {
-                    quizReadAllButton.textContent = "🔊 朗讀全部題目";
-                    quizReadAllButton = null;
-                }
-                return;
-            }
-
-            const quizData = currentQuizData;
-            const total = quizData.length;
-            const index = quizReadAllCurrentIndex;
-
-            // 全部讀完
-            if (index >= total) {
-                if (quizReadAllButton) {
-                    quizReadAllButton.textContent = "🔊 朗讀全部題目";
-                    quizReadAllButton = null;
-                }
-                isQuizReadingAll = false;
-                return;
-            }
-
-            const item = quizData[index];
-            const optA = item.options.find(o => o.letter === 'A');
-            const optB = item.options.find(o => o.letter === 'B');
-            const optC = item.options.find(o => o.letter === 'C');
-
-            // 更新該題的逐題按鈕為「⏹️」
-            const speakBtns = document.querySelectorAll('.quiz-speak-btn');
-            if (speakBtns && speakBtns[index]) {
-                speakBtns[index].textContent = "⏹️";
-            }
-
-            // 使用與單句朗讀完全相同的核心函數
-            speakSingleQuizItem(
-                index,
-                item.explanation,
-                optA ? optA.text : '',
-                optB ? optB.text : '',
-                optC ? optC.text : '',
-                () => {
-                    // 該題朗讀完成，重置該題按鈕
-                    const btns = document.querySelectorAll('.quiz-speak-btn');
-                    if (btns && btns[index]) {
-                        btns[index].textContent = "🔊";
-                    }
-                    // 繼續下一題
-                    if (isQuizReadingAll) {
-                        quizReadAllCurrentIndex++;
-                        // 直接呼叫下一題，不使用 setTimeout
-                        speakNextQuizItem();
-                    } else {
-                        // 若被中斷，重置按鈕
-                        if (quizReadAllButton) {
-                            quizReadAllButton.textContent = "🔊 朗讀全部題目";
-                            quizReadAllButton = null;
-                        }
-                    }
-                }
-            );
-        }
-
         // 渲染選擇題表格
         function renderQuizTable(quizItems, containerId) {
             const container = document.getElementById(containerId);
@@ -1167,7 +1031,6 @@
                         <span>📊 總題數：${total}</span>
                         <span>✅ 已答：${answered}</span>
                         <span>🎯 正確率：${accuracy}%</span>
-                        <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
                     </div>
                     <table class="quiz-table">
                         <thead>
@@ -1179,7 +1042,7 @@
                                 <th style="width:75px;">選項 C</th>
                                 <th style="width:105px;">你的答案</th>
                                 <th style="width:80px;">結果</th>
-                                <th style="width:45px;">🔊</th>
+                                <th style="width:45px;">朗讀</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1246,19 +1109,6 @@
                         currentQuizData[idx].isAnswered = true;
                     }
                     renderQuizTable(currentQuizData, 'quizContainer');
-                    // 重新綁定「朗讀全部」按鈕事件 (因為重新渲染了)
-                    const newReadAllBtn = document.getElementById('quizReadAllBtn');
-                    if (newReadAllBtn) {
-                        newReadAllBtn.onclick = function() {
-                            toggleQuizReadAll(currentQuizData, this);
-                        };
-                        // 保留按鈕狀態
-                        if (isQuizReadingAll && quizReadAllButton) {
-                            newReadAllBtn.textContent = '⏹️ 停止';
-                        } else {
-                            newReadAllBtn.textContent = '🔊 朗讀全部題目';
-                        }
-                    }
                     // 重新綁定逐題按鈕事件
                     document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
                         const idx = parseInt(btn.dataset.index, 10);
@@ -1274,18 +1124,6 @@
                     });
                 });
             });
-
-            // 綁定「朗讀全部」按鈕事件
-            const readAllBtn = document.getElementById('quizReadAllBtn');
-            if (readAllBtn) {
-                readAllBtn.onclick = function() {
-                    toggleQuizReadAll(currentQuizData, this);
-                };
-                // 如果正在朗讀全部，保持按鈕文字
-                if (isQuizReadingAll && quizReadAllButton) {
-                    readAllBtn.textContent = '⏹️ 停止';
-                }
-            }
 
             // 綁定逐題按鈕事件
             document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
@@ -1360,7 +1198,7 @@
             }
         }
 
-        // ====================== 顯示所有生字彈窗 (整合選擇題與朗讀) ======================
+        // ====================== 顯示所有生字彈窗 (整合選擇題與單句朗讀) ======================
         function showAllWordsPopup() {
             const source = (currentWordSet === "must") ? allMustWords : allOnlyWords;
             if (!source.length) {
@@ -1393,9 +1231,6 @@
             currentQuizMode = 'list';
             // 重置朗讀狀態
             stopAllSpeech();
-            isQuizReadingAll = false;
-            quizReadAllButton = null;
-            quizReadAllCurrentIndex = 0;
             quizItemReadingIndex = null;
 
             // 建立生字列表 HTML
@@ -1521,50 +1356,19 @@
                         // 逐題朗讀狀態 (彈窗內獨立)
                         let quizItemReadingIndexLocal = null;
                         let isCantoneseReadingLocal = false;
-                        let isQuizReadingAllLocal = false;
-                        let quizReadAllButtonLocal = null;
-                        let quizReadAllCurrentIndexLocal = 0;
 
                         function stopAllSpeechLocal() {
                             try { window.speechSynthesis.cancel(); } catch(e) {}
                             isCantoneseReadingLocal = false;
                             quizItemReadingIndexLocal = null;
-                            // 重置所有逐題按鈕
                             document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
                                 if (btn.textContent !== '🔊') btn.textContent = '🔊';
                             });
-                            // 重置「朗讀全部」按鈕
-                            const readAllBtn = document.querySelector('.quiz-read-all-btn');
-                            if (readAllBtn && readAllBtn.textContent !== '🔊 朗讀全部題目') {
-                                readAllBtn.textContent = '🔊 朗讀全部題目';
-                            }
-                            // 重置朗讀全部狀態
-                            isQuizReadingAllLocal = false;
-                            quizReadAllButtonLocal = null;
-                            quizReadAllCurrentIndexLocal = 0;
                         }
 
                         // 逐題朗讀 (單句)
                         function toggleSingleQuizReadingLocal(index, buttonElement) {
                             if (!window.quizData || index >= window.quizData.length) return;
-                            // 如果正在朗讀全部，先停止
-                            if (isQuizReadingAllLocal) {
-                                stopAllSpeechLocal();
-                                const readAllBtn = document.querySelector('.quiz-read-all-btn');
-                                if (readAllBtn) {
-                                    readAllBtn.textContent = '🔊 朗讀全部題目';
-                                }
-                                isQuizReadingAllLocal = false;
-                                quizReadAllButtonLocal = null;
-                                quizReadAllCurrentIndexLocal = 0;
-                                document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                                    if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                                });
-                                if (quizItemReadingIndexLocal === index) {
-                                    quizItemReadingIndexLocal = null;
-                                    return;
-                                }
-                            }
                             if (quizItemReadingIndexLocal === index && isCantoneseReadingLocal) {
                                 stopAllSpeechLocal();
                                 buttonElement.textContent = '🔊';
@@ -1590,71 +1394,6 @@
                                 });
                         }
 
-                        // 朗讀全部 (排程器)
-                        function toggleQuizReadAllLocal(quizData, buttonElement) {
-                            if (!quizData || quizData.length === 0) return;
-                            if (isQuizReadingAllLocal && quizReadAllButtonLocal === buttonElement) {
-                                stopAllSpeechLocal();
-                                buttonElement.textContent = '🔊 朗讀全部題目';
-                                return;
-                            }
-                            stopAllSpeechLocal();
-                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                                if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                            });
-                            isQuizReadingAllLocal = true;
-                            quizReadAllButtonLocal = buttonElement;
-                            quizReadAllCurrentIndexLocal = 0;
-                            buttonElement.textContent = '⏹️ 停止';
-                            speakNextQuizItemLocal();
-                        }
-
-                        function speakNextQuizItemLocal() {
-                            if (!isQuizReadingAllLocal) {
-                                if (quizReadAllButtonLocal) {
-                                    quizReadAllButtonLocal.textContent = '🔊 朗讀全部題目';
-                                    quizReadAllButtonLocal = null;
-                                }
-                                return;
-                            }
-                            const quizData = window.quizData;
-                            const total = quizData.length;
-                            const index = quizReadAllCurrentIndexLocal;
-                            if (index >= total) {
-                                if (quizReadAllButtonLocal) {
-                                    quizReadAllButtonLocal.textContent = '🔊 朗讀全部題目';
-                                    quizReadAllButtonLocal = null;
-                                }
-                                isQuizReadingAllLocal = false;
-                                return;
-                            }
-                            const item = quizData[index];
-                            const optA = item.options.find(o => o.letter === 'A');
-                            const optB = item.options.find(o => o.letter === 'B');
-                            const optC = item.options.find(o => o.letter === 'C');
-                            // 更新該題的逐題按鈕
-                            const speakBtns = document.querySelectorAll('.quiz-speak-btn');
-                            if (speakBtns && speakBtns[index]) {
-                                speakBtns[index].textContent = '⏹️';
-                            }
-                            speakSingleQuizItem(index, item.explanation, optA ? optA.text : '', optB ? optB.text : '', optC ? optC
-                                .text : '', () => {
-                                    const btns = document.querySelectorAll('.quiz-speak-btn');
-                                    if (btns && btns[index]) {
-                                        btns[index].textContent = '🔊';
-                                    }
-                                    if (isQuizReadingAllLocal) {
-                                        quizReadAllCurrentIndexLocal++;
-                                        speakNextQuizItemLocal();
-                                    } else {
-                                        if (quizReadAllButtonLocal) {
-                                            quizReadAllButtonLocal.textContent = '🔊 朗讀全部題目';
-                                            quizReadAllButtonLocal = null;
-                                        }
-                                    }
-                                });
-                        }
-
                         // 渲染選擇題表格 (彈窗內)
                         function renderQuizTableInPopup(quizItems) {
                             const container = document.getElementById('quizContainer');
@@ -1673,7 +1412,6 @@
                                     <span>📊 總題數：\${total}</span>
                                     <span>✅ 已答：\${answered}</span>
                                     <span>🎯 正確率：\${accuracy}%</span>
-                                    <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
                                 </div>
                                 <table class="quiz-table">
                                     <thead>
@@ -1685,7 +1423,7 @@
                                             <th style="width:75px;">選項 C</th>
                                             <th style="width:105px;">你的答案</th>
                                             <th style="width:80px;">結果</th>
-                                            <th style="width:45px;">🔊</th>
+                                            <th style="width:45px;">朗讀</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1749,17 +1487,6 @@
                                     renderQuizTableInPopup(window.quizData);
                                 });
                             });
-
-                            // 綁定「朗讀全部」按鈕事件
-                            const readAllBtn = document.getElementById('quizReadAllBtn');
-                            if (readAllBtn) {
-                                readAllBtn.onclick = function() {
-                                    toggleQuizReadAllLocal(window.quizData, this);
-                                };
-                                if (isQuizReadingAllLocal && quizReadAllButtonLocal) {
-                                    readAllBtn.textContent = '⏹️ 停止';
-                                }
-                            }
 
                             // 綁定逐題按鈕事件
                             document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
