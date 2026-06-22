@@ -527,10 +527,7 @@
                     </div>
                     <div id="articleExplanationContent">解釋內容將顯示在這裡</div>
                 </div>
-                <div class="article-nav-footer">
-                    <button id="prevArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">⬅️ 上一篇</button>
-                    <button id="nextArticleBtn" class="btn-icon btn-outline" style="padding: 6px 20px;">下一篇 ➡️</button>
-                </div>
+                <!-- 已移除 上一篇/下一篇 按鈕 -->
             </div>
         </div>
         <div class="footer">
@@ -560,9 +557,10 @@
         let cantoneseVoice = null;
         let cantoneseVoiceEngineReady = false;
 
-        // 朗讀狀態管理 (簡化版，不再需要 currentCantoneseButton)
+        // 朗讀狀態管理
         let isCantoneseReading = false;
         let currentCantoneseButton = null; // 保留用於文章朗讀
+        let currentCancelFunction = null; // 新增：用於取消當前朗讀任務
 
         // 選擇題逐題朗讀狀態管理
         let quizItemReadingIndex = null; // 當前朗讀的題目索引
@@ -632,18 +630,24 @@
             }
 
             let ended = false;
+            let isCancelled = false; // 【新增】為這個朗讀任務建立獨立標記
 
             utterance.onend = () => {
                 if (!ended) {
                     ended = true;
-                    if (onEnd) onEnd();
+                    // 【關鍵修改】只有在未被取消時，才執行回調
+                    if (!isCancelled && onEnd) {
+                        onEnd();
+                    }
                 }
             };
 
             utterance.onerror = () => {
                 if (!ended) {
                     ended = true;
-                    if (onEnd) onEnd();
+                    if (!isCancelled && onEnd) {
+                        onEnd();
+                    }
                 }
             };
 
@@ -651,8 +655,13 @@
                 synth.speak(utterance);
                 // 移除安全計時器，完全依賴 onend 事件
             } catch (e) {
-                if (onEnd) onEnd();
+                if (!isCancelled && onEnd) onEnd();
             }
+
+            // 【新增】返回一個取消函數，供 stopAllSpeech 呼叫
+            return function cancel() {
+                isCancelled = true;
+            };
         }
 
 
@@ -683,8 +692,14 @@
             speakNext();
         }
 
-        // ---------- 共用停止函數 (簡化版) ----------
+        // ---------- 共用停止函數 (強化版) ----------
         function stopAllSpeech() {
+            // 【關鍵修改】先呼叫取消函數，設置標記
+            if (currentCancelFunction) {
+                currentCancelFunction();
+                currentCancelFunction = null;
+            }
+
             if (isCantoneseReading) {
                 try { synth.cancel(); } catch (e) {}
                 isCantoneseReading = false;
@@ -780,13 +795,11 @@
 
                 if (articles.length > 0) {
                     currentArticleIndex = 0;
-                    updateArticleNavButtons();
                     showArticle(0);
                 } else {
                     document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
                     document.getElementById("articleTitleDisplay").textContent = "無文章";
                     document.getElementById("articleExplanationBox").style.display = "none";
-                    updateArticleNavButtons();
                 }
 
                 document.getElementById("dayFilterRow").style.display = "flex";
@@ -862,20 +875,9 @@
             stopAllSpeech();
         }
 
-        // 文章導航按鈕 (上一篇/下一篇) 原本就存在，保留
-        function updateArticleNavButtons() {
-            const prevBtn = document.getElementById("prevArticleBtn");
-            const nextBtn = document.getElementById("nextArticleBtn");
-            if (articles.length === 0) {
-                if (prevBtn) prevBtn.disabled = true;
-                if (nextBtn) nextBtn.disabled = true;
-                return;
-            }
-            if (prevBtn) prevBtn.disabled = (currentArticleIndex === 0);
-            if (nextBtn) nextBtn.disabled = (currentArticleIndex === articles.length - 1);
-        }
+        // 【移除】updateArticleNavButtons 函數 (不再需要)
 
-        // 【修改】顯示文章，同時顯示解釋
+        // 【修改】顯示文章，同時顯示解釋 (移除導航按鈕更新)
         function showArticle(index) {
             if (!articles.length) return;
             if (index < 0) index = 0;
@@ -908,7 +910,6 @@
                 contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
                 explanationBox.style.display = 'none';
             }
-            updateArticleNavButtons();
             // 重置解釋朗讀按鈕狀態
             const readExplanationBtn = document.getElementById("readExplanationBtn");
             if (readExplanationBtn && readExplanationBtn.textContent !== "🔊 朗讀解釋") {
@@ -918,22 +919,7 @@
             stopAllSpeech();
         }
 
-        // 上一篇/下一篇（保持原有功能）
-        function prevArticle() {
-            if (articles.length > 0 && currentArticleIndex > 0) {
-                currentArticleIndex--;
-                showArticle(currentArticleIndex);
-                stopAllSpeech();
-            }
-        }
-
-        function nextArticle() {
-            if (articles.length > 0 && currentArticleIndex < articles.length - 1) {
-                currentArticleIndex++;
-                showArticle(currentArticleIndex);
-                stopAllSpeech();
-            }
-        }
+        // 【移除】prevArticle 和 nextArticle 函數 (不再需要)
 
         // 【修改】隱藏/顯示文章時，同步隱藏/顯示解釋
         function toggleArticleVisibility() {
@@ -974,7 +960,7 @@
             stopAllSpeech();
         }
 
-        // 【修改】朗讀文章（只讀文章內容）
+        // 【修改】朗讀文章（只讀文章內容）- 使用取消標記
         function readArticleOnce() {
             if (!articles.length) return;
             const art = articles[currentArticleIndex];
@@ -991,16 +977,18 @@
             button.classList.add('reading-disabled');
             isCantoneseReading = true;
             ensureCantoneseEngine(() => {
-                speakCantoneseOnce(art.content, () => {
+                // 保存取消函數
+                currentCancelFunction = speakCantoneseOnce(art.content, () => {
                     button.textContent = "🔊 朗讀";
                     button.classList.remove('reading-disabled');
                     isCantoneseReading = false;
                     currentCantoneseButton = null;
+                    currentCancelFunction = null;
                 });
             });
         }
 
-        // 【新增】朗讀文章解釋
+        // 【修改】朗讀文章解釋 - 使用取消標記
         function readExplanationOnce() {
             if (!articles.length) return;
             const art = articles[currentArticleIndex];
@@ -1020,11 +1008,13 @@
             button.classList.add('reading-disabled');
             isCantoneseReading = true;
             ensureCantoneseEngine(() => {
-                speakCantoneseOnce(art.explanation, () => {
+                // 保存取消函數
+                currentCancelFunction = speakCantoneseOnce(art.explanation, () => {
                     button.textContent = "🔊 朗讀解釋";
                     button.classList.remove('reading-disabled');
                     isCantoneseReading = false;
                     currentCantoneseButton = null;
+                    currentCancelFunction = null;
                 });
             });
         }
@@ -1394,6 +1384,7 @@
                         window.allOnlyWords = ${JSON.stringify(allOnlyWords)};
                         window.currentFilteredSource = ${JSON.stringify(filteredSource)};
 
+                        // 複製父頁面的核心函數 (包含取消標記)
                         function getCantoneseVoice() {
                             const voices = window.speechSynthesis.getVoices();
                             if (!voices || voices.length === 0) return null;
@@ -1417,11 +1408,13 @@
                             const voice = getCantoneseVoice();
                             if (voice) utterance.voice = voice;
                             let ended = false;
-                            utterance.onend = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
-                            utterance.onerror = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
+                            let isCancelled = false;
+                            utterance.onend = () => { if (!ended) { ended = true; if (!isCancelled && onEnd) onEnd(); } };
+                            utterance.onerror = () => { if (!ended) { ended = true; if (!isCancelled && onEnd) onEnd(); } };
                             try {
                                 window.speechSynthesis.speak(utterance);
-                            } catch(e) { if (onEnd) onEnd(); }
+                            } catch(e) { if (!isCancelled && onEnd) onEnd(); }
+                            return function cancel() { isCancelled = true; };
                         }
 
                         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
@@ -1447,8 +1440,13 @@
 
                         let quizItemReadingIndexLocal = null;
                         let isCantoneseReadingLocal = false;
+                        let currentCancelFunctionLocal = null;
 
                         function stopAllSpeechLocal() {
+                            if (currentCancelFunctionLocal) {
+                                currentCancelFunctionLocal();
+                                currentCancelFunctionLocal = null;
+                            }
                             if (isCantoneseReadingLocal) {
                                 try { window.speechSynthesis.cancel(); } catch(e) {}
                                 isCantoneseReadingLocal = false;
@@ -1830,10 +1828,8 @@
             document.getElementById("showAllWordsBtn").onclick = showAllWordsPopup;
         }
 
-        // 【修改】綁定文章相關事件，增加解釋朗讀按鈕
+        // 【修改】綁定文章相關事件 (移除導航按鈕綁定)
         function bindArticleEvents() {
-            document.getElementById("prevArticleBtn").onclick = () => prevArticle();
-            document.getElementById("nextArticleBtn").onclick = () => nextArticle();
             document.getElementById("readArticleBtn").onclick = () => readArticleOnce();
             document.getElementById("toggleArticleBtn").onclick = () => toggleArticleVisibility();
             document.getElementById("readExplanationBtn").onclick = () => readExplanationOnce();
@@ -1852,7 +1848,6 @@
                         document.getElementById("articlePanel").style.display = "block";
                         stopAllSpeech();
                         if (articles.length) {
-                            updateArticleNavButtons();
                             const art = articles[currentArticleIndex];
                             if (art && !isArticleHidden) {
                                 document.getElementById("articleContentBox").innerHTML = art.content.replace(/\n/g,
@@ -1889,7 +1884,6 @@
                     document.getElementById("wordPanel").style.display = "none";
                     document.getElementById("articlePanel").style.display = "block";
                     if (articles.length) {
-                        updateArticleNavButtons();
                         showArticle(currentArticleIndex);
                     }
                 }
