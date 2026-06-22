@@ -1343,7 +1343,7 @@
                             utterance.onerror = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
                             try {
                                 window.speechSynthesis.speak(utterance);
-                                setTimeout(() => { if (!ended) { ended = true; if (onEnd) onEnd(); } }, Math.max(2000, text.length * 100));
+                                setTimeout(() => { if (!ended) { ended = true; if (onEnd) onEnd(); } }, Math.max(5000, text.length * 150));
                             } catch(e) { if (onEnd) onEnd(); }
                         }
 
