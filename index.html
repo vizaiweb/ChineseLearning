@@ -560,7 +560,7 @@
         // 朗讀狀態管理
         let isCantoneseReading = false;
         let currentCantoneseButton = null; // 保留用於文章朗讀
-        let currentCancelFunction = null; // 新增：用於取消當前朗讀任務
+        let currentCancelFunction = null; // 【新增】用於取消當前朗讀任務
 
         // 選擇題逐題朗讀狀態管理
         let quizItemReadingIndex = null; // 當前朗讀的題目索引
@@ -615,8 +615,7 @@
                 return;
             }
 
-            try { synth.cancel(); } catch (e) {}
-
+            // 注意：這裡不再呼叫 synth.cancel()，由 stopAllSpeech 統一管理
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = "yue";
             utterance.rate = 0.85;
@@ -630,7 +629,7 @@
             }
 
             let ended = false;
-            let isCancelled = false; // 【新增】為這個朗讀任務建立獨立標記
+            let isCancelled = false; // 【核心】為這個朗讀任務建立獨立標記
 
             utterance.onend = () => {
                 if (!ended) {
@@ -645,6 +644,7 @@
             utterance.onerror = () => {
                 if (!ended) {
                     ended = true;
+                    // 【關鍵修改】只有在未被取消時，才執行回調
                     if (!isCancelled && onEnd) {
                         onEnd();
                     }
@@ -683,6 +683,7 @@
                     if (onEnd) onEnd();
                     return;
                 }
+                // 注意：speakCantoneseOnce 返回取消函數，但此處不需保存，由 stopAllSpeech 統一處理
                 speakCantoneseOnce(parts[currentIndex], () => {
                     currentIndex++;
                     speakNext();
@@ -694,18 +695,20 @@
 
         // ---------- 共用停止函數 (強化版) ----------
         function stopAllSpeech() {
-            // 【關鍵修改】先呼叫取消函數，設置標記
+            // 【關鍵修改】先呼叫取消函數，設置標記，防止 onend 回調執行
             if (currentCancelFunction) {
                 currentCancelFunction();
                 currentCancelFunction = null;
             }
 
+            // 再執行語音取消
             if (isCantoneseReading) {
                 try { synth.cancel(); } catch (e) {}
                 isCantoneseReading = false;
             }
             // 重置逐題朗讀狀態
             quizItemReadingIndex = null;
+            // 重置按鈕狀態 (此處重置是安全的，因為 onend 回調已被取消函數阻止)
             if (currentCantoneseButton) {
                 // 如果文章朗讀按鈕正在顯示「停止」，恢復為「朗讀」
                 if (currentCantoneseButton.id === 'readArticleBtn') {
