@@ -366,7 +366,7 @@
             gap: 12px;
             margin-bottom: 8px;
         }
-        /* 逐題朗讀按鈕 */
+        /* 逐題朗讀按鈕 - 不再需要停止樣式 */
         .quiz-speak-btn {
             background: none;
             border: none;
@@ -513,11 +513,8 @@
         let cantoneseVoice = null;
         let cantoneseVoiceEngineReady = false;
 
-        // 朗讀狀態管理
+        // 朗讀狀態管理 (簡化版，不再需要 currentCantoneseButton)
         let isCantoneseReading = false;
-        let currentCantoneseButton = null;
-        let currentReadingText = "";
-        let readingTimeout = null;
 
         // 選擇題逐題朗讀狀態管理
         let quizItemReadingIndex = null; // 當前朗讀的題目索引
@@ -613,9 +610,8 @@
 
         // ---------- 【核心】單句朗讀（分段循序朗讀） ----------
         // 朗讀單一題目 (分段：題號+解釋 → 選項A → 選項B → 選項C)
-        // 全部讀完後才觸發 onEnd，確保按鈕不會提前還原
+        // 全部讀完後才觸發 onEnd
         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
-            // 將內容分成四個短句，確保每段都是完整的語意單元
             const parts = [
                 `題號${index + 1}。${explanation}`,
                 `選項A：${optA}`,
@@ -626,12 +622,10 @@
             let currentIndex = 0;
 
             function speakNext() {
-                // 所有段落都讀完了 → 觸發最終回調，還原按鈕
                 if (currentIndex >= parts.length) {
                     if (onEnd) onEnd();
                     return;
                 }
-                // 朗讀當前段落，完成後繼續下一段
                 speakCantoneseOnce(parts[currentIndex], () => {
                     currentIndex++;
                     speakNext();
@@ -641,33 +635,14 @@
             speakNext();
         }
 
-        // ---------- 共用停止函數 ----------
+        // ---------- 共用停止函數 (簡化版) ----------
         function stopAllSpeech() {
             if (isCantoneseReading) {
                 try { synth.cancel(); } catch (e) {}
-                if (readingTimeout) clearTimeout(readingTimeout);
-                if (currentCantoneseButton) {
-                    if (currentCantoneseButton.id === 'readWordThreeBtn') {
-                        currentCantoneseButton.textContent = "🔊 生字x3";
-                    } else if (currentCantoneseButton.id === 'readMeaningBtn') {
-                        currentCantoneseButton.textContent = "🗣️ 解釋x1";
-                    } else if (currentCantoneseButton.id === 'readArticleBtn') {
-                        currentCantoneseButton.textContent = "🔊 朗讀";
-                    }
-                    currentCantoneseButton.classList.remove('reading-disabled');
-                    currentCantoneseButton = null;
-                }
                 isCantoneseReading = false;
-                currentReadingText = "";
             }
             // 重置逐題朗讀狀態
             quizItemReadingIndex = null;
-            // 重置所有逐題按鈕文字 (如果彈窗存在)
-            try {
-                document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                    if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                });
-            } catch (e) {}
         }
 
         setTimeout(() => {
@@ -987,33 +962,28 @@
             return quizItems;
         }
 
-        // ---------- 【核心】逐題朗讀（單句朗讀） ----------
+        // ---------- 【核心】逐題朗讀（無停止鍵版本） ----------
         function toggleSingleQuizReading(index, buttonElement) {
             if (!currentQuizData || index >= currentQuizData.length) return;
 
-            // 如果該題正在朗讀 → 停止
+            // 如果該題正在朗讀 → 忽略本次點擊
             if (quizItemReadingIndex === index && isCantoneseReading) {
-                stopAllSpeech();
-                buttonElement.textContent = "🔊";
-                quizItemReadingIndex = null;
                 return;
             }
 
-            stopAllSpeech();
-            // 重置其他逐題按鈕
-            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                if (btn.textContent !== '🔊') btn.textContent = '🔊';
-            });
+            // 如果有其他朗讀正在進行，先停止
+            if (isCantoneseReading) {
+                stopAllSpeech();
+            }
 
             const item = currentQuizData[index];
             const optA = item.options.find(o => o.letter === 'A');
             const optB = item.options.find(o => o.letter === 'B');
             const optC = item.options.find(o => o.letter === 'C');
-            buttonElement.textContent = "⏹️";
+
             quizItemReadingIndex = index;
             isCantoneseReading = true;
 
-            // 使用核心朗讀函數
             speakSingleQuizItem(
                 index,
                 item.explanation,
@@ -1021,7 +991,6 @@
                 optB ? optB.text : '',
                 optC ? optC.text : '',
                 () => {
-                    buttonElement.textContent = "🔊";
                     quizItemReadingIndex = null;
                     isCantoneseReading = false;
                 }
@@ -1131,12 +1100,6 @@
                         btn.onclick = function() {
                             toggleSingleQuizReading(idx, this);
                         };
-                        // 如果該題正在朗讀，保持按鈕文字
-                        if (quizItemReadingIndex === idx && isCantoneseReading) {
-                            btn.textContent = '⏹️';
-                        } else {
-                            btn.textContent = '🔊';
-                        }
                     });
                 });
             });
@@ -1147,12 +1110,6 @@
                 btn.onclick = function() {
                     toggleSingleQuizReading(idx, this);
                 };
-                // 如果該題正在朗讀，保持按鈕文字
-                if (quizItemReadingIndex === idx && isCantoneseReading) {
-                    btn.textContent = '⏹️';
-                } else {
-                    btn.textContent = '🔊';
-                }
             });
         }
 
@@ -1331,7 +1288,7 @@
                         window.allOnlyWords = ${JSON.stringify(allOnlyWords)};
                         window.currentFilteredSource = ${JSON.stringify(filteredSource)};
 
-                        // 複製父頁面的核心函數
+                        // 複製父頁面的核心函數 (簡化版，無停止鍵)
                         function getCantoneseVoice() {
                             const voices = window.speechSynthesis.getVoices();
                             if (!voices || voices.length === 0) return null;
@@ -1389,37 +1346,35 @@
                         let isCantoneseReadingLocal = false;
 
                         function stopAllSpeechLocal() {
-                            try { window.speechSynthesis.cancel(); } catch(e) {}
-                            isCantoneseReadingLocal = false;
+                            if (isCantoneseReadingLocal) {
+                                try { window.speechSynthesis.cancel(); } catch(e) {}
+                                isCantoneseReadingLocal = false;
+                            }
                             quizItemReadingIndexLocal = null;
-                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                                if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                            });
                         }
 
-                        // 逐題朗讀 (單句)
+                        // 逐題朗讀 (無停止鍵版本)
                         function toggleSingleQuizReadingLocal(index, buttonElement) {
                             if (!window.quizData || index >= window.quizData.length) return;
+
                             if (quizItemReadingIndexLocal === index && isCantoneseReadingLocal) {
-                                stopAllSpeechLocal();
-                                buttonElement.textContent = '🔊';
-                                quizItemReadingIndexLocal = null;
                                 return;
                             }
-                            stopAllSpeechLocal();
-                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                                if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                            });
+
+                            if (isCantoneseReadingLocal) {
+                                stopAllSpeechLocal();
+                            }
+
                             const item = window.quizData[index];
                             const optA = item.options.find(o => o.letter === 'A');
                             const optB = item.options.find(o => o.letter === 'B');
                             const optC = item.options.find(o => o.letter === 'C');
-                            buttonElement.textContent = '⏹️';
+
                             quizItemReadingIndexLocal = index;
                             isCantoneseReadingLocal = true;
+
                             speakSingleQuizItem(index, item.explanation, optA ? optA.text : '', optB ? optB.text : '', optC ? optC
                                 .text : '', () => {
-                                    buttonElement.textContent = '🔊';
                                     quizItemReadingIndexLocal = null;
                                     isCantoneseReadingLocal = false;
                                 });
@@ -1525,11 +1480,6 @@
                                 btn.onclick = function() {
                                     toggleSingleQuizReadingLocal(idx, this);
                                 };
-                                if (quizItemReadingIndexLocal === idx && isCantoneseReadingLocal) {
-                                    btn.textContent = '⏹️';
-                                } else {
-                                    btn.textContent = '🔊';
-                                }
                             });
                         }
 
