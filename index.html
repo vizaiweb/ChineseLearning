@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>小學中文學習 - 識字與文章</title>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js">
+    </script>
     <style>
         * {
             box-sizing: border-box;
@@ -604,21 +605,23 @@
 
             try {
                 synth.speak(utterance);
+                // 安全計時器（僅作為異常保護，正常情況由 onend 觸發）
                 setTimeout(() => {
                     if (!ended) {
                         ended = true;
                         if (onEnd) onEnd();
                     }
-                }, Math.max(1000, text.length * 100));
+                }, Math.max(2000, text.length * 100));
             } catch (e) {
                 if (onEnd) onEnd();
             }
         }
 
-        // 朗讀單一題目 (解釋 + 三個選項)
-        function speakQuizItem(explanation, optA, optB, optC, onEnd) {
+        // 朗讀單一題目 (題號 + 解釋內容 + 選項，不讀『解釋』二字)
+        function speakQuizItemFull(index, explanation, optA, optB, optC, onEnd) {
+            // 移除解釋二字，直接讀內容
             const text =
-                `解釋：${explanation}。選項A：${optA}，選項B：${optB}，選項C：${optC}。`;
+                `題號${index + 1}。${explanation}。選項A：${optA}，選項B：${optB}，選項C：${optC}。`;
             speakCantoneseOnce(text, onEnd);
         }
 
@@ -977,10 +980,11 @@
             return quizItems;
         }
 
-        // 朗讀全部題目
+        // 朗讀全部題目 - 修復版本：依賴 onend 事件，不使用固定計時器
         function toggleQuizReadAll(quizData, buttonElement) {
             if (!quizData || quizData.length === 0) return;
 
+            // 如果正在朗讀全部且是同一按鈕 → 停止
             if (isQuizReadingAll && quizReadAllButton === buttonElement) {
                 stopAllSpeech();
                 buttonElement.textContent = "🔊 朗讀全部題目";
@@ -993,45 +997,74 @@
                 return;
             }
 
+            // 停止其他朗讀
             stopAllSpeech();
+
             // 重置所有逐題按鈕
             document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
                 if (btn.textContent !== '🔊') btn.textContent = '🔊';
             });
-            // 重置逐題朗讀狀態
             quizItemReadingIndex = null;
 
+            // 設定朗讀全部狀態
             isQuizReadingAll = true;
             quizReadAllButton = buttonElement;
             buttonElement.textContent = "⏹️ 停止";
 
             let index = 0;
+            const total = quizData.length;
 
+            // 遞迴朗讀函數 - 完全依賴 onend 事件驅動
             function speakNext() {
-                if (!isQuizReadingAll) return;
-                if (index >= quizData.length) {
+                // 檢查是否被中斷
+                if (!isQuizReadingAll) {
+                    if (buttonElement) {
+                        buttonElement.textContent = "🔊 朗讀全部題目";
+                        isQuizReadingAll = false;
+                        quizReadAllButton = null;
+                    }
+                    return;
+                }
+
+                // 全部讀完
+                if (index >= total) {
                     buttonElement.textContent = "🔊 朗讀全部題目";
                     isQuizReadingAll = false;
                     quizReadAllButton = null;
                     return;
                 }
+
                 const item = quizData[index];
                 const optA = item.options.find(o => o.letter === 'A');
                 const optB = item.options.find(o => o.letter === 'B');
                 const optC = item.options.find(o => o.letter === 'C');
-                speakQuizItem(
+
+                // 使用 speakQuizItemFull，當 onend 觸發時才呼叫下一題
+                speakQuizItemFull(
+                    index,
                     item.explanation,
                     optA ? optA.text : '',
                     optB ? optB.text : '',
                     optC ? optC.text : '',
                     () => {
+                        // 只有在仍然處於朗讀全部狀態時才繼續
                         if (isQuizReadingAll) {
                             index++;
-                            setTimeout(speakNext, 500);
+                            // 直接呼叫 speakNext，不使用 setTimeout
+                            speakNext();
+                        } else {
+                            // 若被中斷，重置按鈕
+                            if (buttonElement) {
+                                buttonElement.textContent = "🔊 朗讀全部題目";
+                                isQuizReadingAll = false;
+                                quizReadAllButton = null;
+                            }
                         }
                     }
                 );
             }
+
+            // 開始朗讀第一題
             speakNext();
         }
 
@@ -1067,11 +1100,13 @@
             const optA = item.options.find(o => o.letter === 'A');
             const optB = item.options.find(o => o.letter === 'B');
             const optC = item.options.find(o => o.letter === 'C');
-            buttonElement.textContent = "⏹️ 停止";
+            buttonElement.textContent = "⏹️";
             quizItemReadingIndex = index;
             isCantoneseReading = true;
 
-            speakQuizItem(
+            // 讀出題號 + 解釋內容 + 選項
+            speakQuizItemFull(
+                index,
                 item.explanation,
                 optA ? optA.text : '',
                 optB ? optB.text : '',
@@ -1099,27 +1134,27 @@
             let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
 
             let html = `
-                <div class="quiz-stats">
-                    <span>📊 總題數：${total}</span>
-                    <span>✅ 已答：${answered}</span>
-                    <span>🎯 正確率：${accuracy}%</span>
-                    <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
-                </div>
-                <table class="quiz-table">
-                    <thead>
-                        <tr>
-                            <th style="width:45px;">題號</th>
-                            <th>解釋</th>
-                            <th style="width:75px;">選項 A</th>
-                            <th style="width:75px;">選項 B</th>
-                            <th style="width:75px;">選項 C</th>
-                            <th style="width:105px;">你的答案</th>
-                            <th style="width:80px;">結果</th>
-                            <th style="width:45px;">🔊</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+                    <div class="quiz-stats">
+                        <span>📊 總題數：${total}</span>
+                        <span>✅ 已答：${answered}</span>
+                        <span>🎯 正確率：${accuracy}%</span>
+                        <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
+                    </div>
+                    <table class="quiz-table">
+                        <thead>
+                            <tr>
+                                <th style="width:45px;">題號</th>
+                                <th>解釋</th>
+                                <th style="width:75px;">選項 A</th>
+                                <th style="width:75px;">選項 B</th>
+                                <th style="width:75px;">選項 C</th>
+                                <th style="width:105px;">你的答案</th>
+                                <th style="width:80px;">結果</th>
+                                <th style="width:45px;">🔊</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
 
             for (let i = 0; i < quizItems.length; i++) {
                 const item = quizItems[i];
@@ -1142,32 +1177,32 @@
                 }
 
                 html += `
-                    <tr class="${rowClass}" data-index="${i}">
-                        <td style="text-align:center; font-weight:bold;">${i + 1}</td>
-                        <td>${item.explanation}</td>
-                        <td>${optionA ? optionA.text : ''}</td>
-                        <td>${optionB ? optionB.text : ''}</td>
-                        <td>${optionC ? optionC.text : ''}</td>
-                        <td>
-                            <select class="quiz-select" data-index="${i}">
-                                <option value="">請揀選</option>
-                                <option value="A" ${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
-                                <option value="B" ${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
-                                <option value="C" ${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
-                            </select>
-                        </td>
-                        <td style="text-align:center; font-weight:bold;">${resultDisplay}</td>
-                        <td style="text-align:center;">
-                            <button class="quiz-speak-btn" data-index="${i}">🔊</button>
-                        </td>
-                    </tr>
-                `;
+                        <tr class="${rowClass}" data-index="${i}">
+                            <td style="text-align:center; font-weight:bold;">${i + 1}</td>
+                            <td>${item.explanation}</td>
+                            <td>${optionA ? optionA.text : ''}</td>
+                            <td>${optionB ? optionB.text : ''}</td>
+                            <td>${optionC ? optionC.text : ''}</td>
+                            <td>
+                                <select class="quiz-select" data-index="${i}">
+                                    <option value="">請揀選</option>
+                                    <option value="A" ${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
+                                    <option value="B" ${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
+                                    <option value="C" ${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
+                                </select>
+                            </td>
+                            <td style="text-align:center; font-weight:bold;">${resultDisplay}</td>
+                            <td style="text-align:center;">
+                                <button class="quiz-speak-btn" data-index="${i}">🔊</button>
+                            </td>
+                        </tr>
+                    `;
             }
 
             html += `
-                    </tbody>
-                </table>
-            `;
+                        </tbody>
+                    </table>
+                `;
 
             container.innerHTML = html;
 
@@ -1203,7 +1238,7 @@
                         };
                         // 如果該題正在朗讀，保持按鈕文字
                         if (quizItemReadingIndex === idx && isCantoneseReading) {
-                            btn.textContent = '⏹️ 停止';
+                            btn.textContent = '⏹️';
                         } else {
                             btn.textContent = '🔊';
                         }
@@ -1231,7 +1266,9 @@
                 };
                 // 如果該題正在朗讀，保持按鈕文字
                 if (quizItemReadingIndex === idx && isCantoneseReading) {
-                    btn.textContent = '⏹️ 停止';
+                    btn.textContent = '⏹️';
+                } else {
+                    btn.textContent = '🔊';
                 }
             });
         }
@@ -1333,7 +1370,7 @@
 
             // 建立生字列表 HTML
             let tableHtml = `<table border="1" cellpadding="8" style="border-collapse:collapse; width:100%;">
-                <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
+                    <thead><tr style="background:#ffcd94;"><th>生字</th><th>解釋</th><th>例句</th><th>課次</th></tr></thead><tbody>`;
             filteredSource.forEach(w => {
                 tableHtml +=
                     `<tr><td style="font-weight:bold;">${w.character}</td><td>${w.explanation || ''}</td><td>${w.example || ''}</td><td>${w.day || ''}</td></tr>`;
@@ -1342,478 +1379,484 @@
 
             // 建立完整彈窗 HTML
             const popupHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>${setTitle}</title>
-                <style>
-                    body { font-family: 'Segoe UI', 'Noto Sans CJK TC', sans-serif; padding: 20px; background: #f8f4ec; }
-                    .popup-container { max-width: 950px; margin: 0 auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-                    .popup-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
-                    .popup-header h2 { margin: 0; color: #b45f2b; }
-                    .popup-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-                    .btn-toggle { background: #ffaa66; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
-                    .btn-toggle:active { transform: scale(0.96); }
-                    .btn-close { background: #b0a090; border: none; border-radius: 40px; padding: 8px 24px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
-                    .btn-close:active { transform: scale(0.96); }
-                    .quiz-stats { font-size: 16px; color: #b45f2b; margin: 8px 0 12px 0; font-weight: 600; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
-                    .quiz-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
-                    .quiz-table th { background: #ffcd94; padding: 10px 8px; text-align: left; font-weight: 700; color: #2d1f0c; border: 1px solid #e0b87a; }
-                    .quiz-table td { padding: 10px 8px; border: 1px solid #e0b87a; vertical-align: middle; background: #fffcf0; }
-                    .quiz-table .correct { background: #d4edda; }
-                    .quiz-table .wrong { background: #f8d7da; }
-                    .quiz-table select { padding: 4px 6px; border-radius: 20px; border: 1px solid #ffcd94; background: white; font-size: 14px; width: 100%; max-width: 100px; }
-                    .quiz-speak-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 30px; transition: 0.1s; }
-                    .quiz-speak-btn:hover { background: #f0e8d8; }
-                    .quiz-speak-btn:active { transform: scale(0.90); }
-                    .quiz-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #ffe0b0; }
-                    .word-list-container { margin-top: 10px; }
-                    .word-list-container table { border-collapse: collapse; width: 100%; }
-                    .word-list-container th { background: #ffcd94; padding: 8px; border: 1px solid #e0b87a; }
-                    .word-list-container td { padding: 8px; border: 1px solid #e0b87a; background: #fffcf0; }
-                    .quiz-mode-btn { background: #ffaa66; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
-                    .quiz-mode-btn:active { transform: scale(0.96); }
-                    @media (max-width: 600px) {
-                        .quiz-table { font-size: 13px; }
-                        .quiz-table th, .quiz-table td { padding: 6px 4px; }
-                        .quiz-table select { font-size: 12px; max-width: 70px; }
-                        .popup-header { flex-direction: column; align-items: stretch; }
-                        .popup-controls { justify-content: space-between; }
-                        .quiz-speak-btn { font-size: 16px; padding: 2px 4px; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="popup-container">
-                    <div class="popup-header">
-                        <div>
-                            <h2 id="quizTitle">📚 生字列表</h2>
-                            <div style="font-size:14px; color:#8b6946; margin-top:4px;">共 ${filteredSource.length} 字</div>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${setTitle}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', 'Noto Sans CJK TC', sans-serif; padding: 20px; background: #f8f4ec; }
+                        .popup-container { max-width: 950px; margin: 0 auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+                        .popup-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
+                        .popup-header h2 { margin: 0; color: #b45f2b; }
+                        .popup-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+                        .btn-toggle { background: #ffaa66; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
+                        .btn-toggle:active { transform: scale(0.96); }
+                        .btn-close { background: #b0a090; border: none; border-radius: 40px; padding: 8px 24px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
+                        .btn-close:active { transform: scale(0.96); }
+                        .quiz-stats { font-size: 16px; color: #b45f2b; margin: 8px 0 12px 0; font-weight: 600; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+                        .quiz-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
+                        .quiz-table th { background: #ffcd94; padding: 10px 8px; text-align: left; font-weight: 700; color: #2d1f0c; border: 1px solid #e0b87a; }
+                        .quiz-table td { padding: 10px 8px; border: 1px solid #e0b87a; vertical-align: middle; background: #fffcf0; }
+                        .quiz-table .correct { background: #d4edda; }
+                        .quiz-table .wrong { background: #f8d7da; }
+                        .quiz-table select { padding: 4px 6px; border-radius: 20px; border: 1px solid #ffcd94; background: white; font-size: 14px; width: 100%; max-width: 100px; }
+                        .quiz-speak-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 30px; transition: 0.1s; }
+                        .quiz-speak-btn:hover { background: #f0e8d8; }
+                        .quiz-speak-btn:active { transform: scale(0.90); }
+                        .quiz-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #ffe0b0; }
+                        .word-list-container { margin-top: 10px; }
+                        .word-list-container table { border-collapse: collapse; width: 100%; }
+                        .word-list-container th { background: #ffcd94; padding: 8px; border: 1px solid #e0b87a; }
+                        .word-list-container td { padding: 8px; border: 1px solid #e0b87a; background: #fffcf0; }
+                        .quiz-mode-btn { background: #ffaa66; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; color: white; cursor: pointer; font-size: 15px; }
+                        .quiz-mode-btn:active { transform: scale(0.96); }
+                        @media (max-width: 600px) {
+                            .quiz-table { font-size: 13px; }
+                            .quiz-table th, .quiz-table td { padding: 6px 4px; }
+                            .quiz-table select { font-size: 12px; max-width: 70px; }
+                            .popup-header { flex-direction: column; align-items: stretch; }
+                            .popup-controls { justify-content: space-between; }
+                            .quiz-speak-btn { font-size: 16px; padding: 2px 4px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="popup-container">
+                        <div class="popup-header">
+                            <div>
+                                <h2 id="quizTitle">📚 生字列表</h2>
+                                <div style="font-size:14px; color:#8b6946; margin-top:4px;">共 ${filteredSource.length} 字</div>
+                            </div>
+                            <div class="popup-controls">
+                                <button id="modeToggleBtn" class="btn-toggle">📝 選擇題</button>
+                                <button class="btn-close" onclick="window.close()">❌ 關閉</button>
+                            </div>
                         </div>
-                        <div class="popup-controls">
-                            <button id="modeToggleBtn" class="btn-toggle">📝 選擇題</button>
+                        <div id="wordListContainer" class="word-list-container">
+                            ${tableHtml}
+                        </div>
+                        <div id="quizContainer" style="display:none;"></div>
+                        <div class="quiz-footer">
+                            <button id="modeToggleFooterBtn" class="btn-toggle">📝 選擇題</button>
                             <button class="btn-close" onclick="window.close()">❌ 關閉</button>
                         </div>
                     </div>
-                    <div id="wordListContainer" class="word-list-container">
-                        ${tableHtml}
-                    </div>
-                    <div id="quizContainer" style="display:none;"></div>
-                    <div class="quiz-footer">
-                        <button id="modeToggleFooterBtn" class="btn-toggle">📝 選擇題</button>
-                        <button class="btn-close" onclick="window.close()">❌ 關閉</button>
-                    </div>
-                </div>
-                <script>
-                    // 傳遞資料到彈窗
-                    window.quizData = ${JSON.stringify(currentQuizData)};
-                    window.currentWordSet = "${currentWordSet}";
-                    window.allMustWords = ${JSON.stringify(allMustWords)};
-                    window.allOnlyWords = ${JSON.stringify(allOnlyWords)};
-                    window.currentFilteredSource = ${JSON.stringify(filteredSource)};
+                    <script>
+                        // 傳遞資料到彈窗
+                        window.quizData = ${JSON.stringify(currentQuizData)};
+                        window.currentWordSet = "${currentWordSet}";
+                        window.allMustWords = ${JSON.stringify(allMustWords)};
+                        window.allOnlyWords = ${JSON.stringify(allOnlyWords)};
+                        window.currentFilteredSource = ${JSON.stringify(filteredSource)};
 
-                    // 複製父頁面的核心函數
-                    function getCantoneseVoice() {
-                        const voices = window.speechSynthesis.getVoices();
-                        if (!voices || voices.length === 0) return null;
-                        return voices.find(v => v.name && v.name === 'Sin-Ji') ||
-                               voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
-                               voices.find(v => v.name && v.name.includes('Cantonese')) ||
-                               voices.find(v => v.lang === 'yue') ||
-                               voices.find(v => v.lang === 'zh-HK') ||
-                               voices.find(v => v.lang && v.lang.includes('hk')) ||
-                               null;
-                    }
-
-                    function speakCantoneseOnce(text, onEnd) {
-                        if (!text || !text.trim()) { if (onEnd) onEnd(); return; }
-                        try { window.speechSynthesis.cancel(); } catch(e) {}
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = "yue";
-                        utterance.rate = 0.85;
-                        utterance.pitch = 1.0;
-                        utterance.volume = 1;
-                        const voice = getCantoneseVoice();
-                        if (voice) utterance.voice = voice;
-                        let ended = false;
-                        utterance.onend = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
-                        utterance.onerror = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
-                        try {
-                            window.speechSynthesis.speak(utterance);
-                            setTimeout(() => { if (!ended) { ended = true; if (onEnd) onEnd(); } }, Math.max(1000, text.length * 100));
-                        } catch(e) { if (onEnd) onEnd(); }
-                    }
-
-                    function speakQuizItem(explanation, optA, optB, optC, onEnd) {
-                        const text = \`解釋：\${explanation}。選項A：\${optA}，選項B：\${optB}，選項C：\${optC}。\`;
-                        speakCantoneseOnce(text, onEnd);
-                    }
-
-                    // 逐題朗讀狀態 (彈窗內獨立)
-                    let quizItemReadingIndexLocal = null;
-                    let isCantoneseReadingLocal = false;
-
-                    function stopAllSpeechLocal() {
-                        try { window.speechSynthesis.cancel(); } catch(e) {}
-                        isCantoneseReadingLocal = false;
-                        quizItemReadingIndexLocal = null;
-                        document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                            if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                        });
-                        const readAllBtn = document.querySelector('.quiz-read-all-btn');
-                        if (readAllBtn && readAllBtn.textContent !== '🔊 朗讀全部題目') {
-                            readAllBtn.textContent = '🔊 朗讀全部題目';
+                        // 複製父頁面的核心函數
+                        function getCantoneseVoice() {
+                            const voices = window.speechSynthesis.getVoices();
+                            if (!voices || voices.length === 0) return null;
+                            return voices.find(v => v.name && v.name === 'Sin-Ji') ||
+                                   voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
+                                   voices.find(v => v.name && v.name.includes('Cantonese')) ||
+                                   voices.find(v => v.lang === 'yue') ||
+                                   voices.find(v => v.lang === 'zh-HK') ||
+                                   voices.find(v => v.lang && v.lang.includes('hk')) ||
+                                   null;
                         }
-                    }
 
-                    function toggleSingleQuizReadingLocal(index, buttonElement) {
-                        if (!window.quizData || index >= window.quizData.length) return;
-                        // 如果正在朗讀全部，先停止
-                        if (window.isQuizReadingAllLocal) {
-                            stopAllSpeechLocal();
-                            const readAllBtn = document.querySelector('.quiz-read-all-btn');
-                            if (readAllBtn) {
-                                readAllBtn.textContent = '🔊 朗讀全部題目';
-                                window.isQuizReadingAllLocal = false;
-                                window.quizReadAllButtonLocal = null;
-                            }
+                        function speakCantoneseOnce(text, onEnd) {
+                            if (!text || !text.trim()) { if (onEnd) onEnd(); return; }
+                            try { window.speechSynthesis.cancel(); } catch(e) {}
+                            const utterance = new SpeechSynthesisUtterance(text);
+                            utterance.lang = "yue";
+                            utterance.rate = 0.85;
+                            utterance.pitch = 1.0;
+                            utterance.volume = 1;
+                            const voice = getCantoneseVoice();
+                            if (voice) utterance.voice = voice;
+                            let ended = false;
+                            utterance.onend = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
+                            utterance.onerror = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
+                            try {
+                                window.speechSynthesis.speak(utterance);
+                                setTimeout(() => { if (!ended) { ended = true; if (onEnd) onEnd(); } }, Math.max(2000, text.length * 100));
+                            } catch(e) { if (onEnd) onEnd(); }
                         }
-                        if (quizItemReadingIndexLocal === index && isCantoneseReadingLocal) {
-                            stopAllSpeechLocal();
-                            buttonElement.textContent = '🔊';
+
+                        function speakQuizItemFull(index, explanation, optA, optB, optC, onEnd) {
+                            const text = \`題號\${index + 1}。\${explanation}。選項A：\${optA}，選項B：\${optB}，選項C：\${optC}。\`;
+                            speakCantoneseOnce(text, onEnd);
+                        }
+
+                        // 逐題朗讀狀態 (彈窗內獨立)
+                        let quizItemReadingIndexLocal = null;
+                        let isCantoneseReadingLocal = false;
+
+                        function stopAllSpeechLocal() {
+                            try { window.speechSynthesis.cancel(); } catch(e) {}
+                            isCantoneseReadingLocal = false;
                             quizItemReadingIndexLocal = null;
-                            return;
-                        }
-                        stopAllSpeechLocal();
-                        document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                            if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                        });
-                        const item = window.quizData[index];
-                        const optA = item.options.find(o => o.letter === 'A');
-                        const optB = item.options.find(o => o.letter === 'B');
-                        const optC = item.options.find(o => o.letter === 'C');
-                        buttonElement.textContent = '⏹️ 停止';
-                        quizItemReadingIndexLocal = index;
-                        isCantoneseReadingLocal = true;
-                        speakQuizItem(
-                            item.explanation,
-                            optA ? optA.text : '',
-                            optB ? optB.text : '',
-                            optC ? optC.text : '',
-                            () => {
-                                buttonElement.textContent = '🔊';
-                                quizItemReadingIndexLocal = null;
-                                isCantoneseReadingLocal = false;
-                            }
-                        );
-                    }
-
-                    // 朗讀全部題目 (彈窗內)
-                    let isQuizReadingAllLocal = false;
-                    let quizReadAllButtonLocal = null;
-
-                    function toggleQuizReadAllLocal(quizData, buttonElement) {
-                        if (!quizData || quizData.length === 0) return;
-                        if (isQuizReadingAllLocal && quizReadAllButtonLocal === buttonElement) {
-                            stopAllSpeechLocal();
-                            buttonElement.textContent = '🔊 朗讀全部題目';
-                            isQuizReadingAllLocal = false;
-                            quizReadAllButtonLocal = null;
                             document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
                                 if (btn.textContent !== '🔊') btn.textContent = '🔊';
                             });
-                            return;
+                            const readAllBtn = document.querySelector('.quiz-read-all-btn');
+                            if (readAllBtn && readAllBtn.textContent !== '🔊 朗讀全部題目') {
+                                readAllBtn.textContent = '🔊 朗讀全部題目';
+                            }
                         }
-                        stopAllSpeechLocal();
-                        document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                            if (btn.textContent !== '🔊') btn.textContent = '🔊';
-                        });
-                        quizItemReadingIndexLocal = null;
-                        isQuizReadingAllLocal = true;
-                        quizReadAllButtonLocal = buttonElement;
-                        buttonElement.textContent = '⏹️ 停止';
-                        let index = 0;
 
-                        function speakNext() {
-                            if (!isQuizReadingAllLocal) return;
-                            if (index >= quizData.length) {
-                                buttonElement.textContent = '🔊 朗讀全部題目';
-                                isQuizReadingAllLocal = false;
-                                quizReadAllButtonLocal = null;
+                        function toggleSingleQuizReadingLocal(index, buttonElement) {
+                            if (!window.quizData || index >= window.quizData.length) return;
+                            // 如果正在朗讀全部，先停止
+                            if (window.isQuizReadingAllLocal) {
+                                stopAllSpeechLocal();
+                                const readAllBtn = document.querySelector('.quiz-read-all-btn');
+                                if (readAllBtn) {
+                                    readAllBtn.textContent = '🔊 朗讀全部題目';
+                                    window.isQuizReadingAllLocal = false;
+                                    window.quizReadAllButtonLocal = null;
+                                }
+                            }
+                            if (quizItemReadingIndexLocal === index && isCantoneseReadingLocal) {
+                                stopAllSpeechLocal();
+                                buttonElement.textContent = '🔊';
+                                quizItemReadingIndexLocal = null;
                                 return;
                             }
-                            const item = quizData[index];
+                            stopAllSpeechLocal();
+                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                                if (btn.textContent !== '🔊') btn.textContent = '🔊';
+                            });
+                            const item = window.quizData[index];
                             const optA = item.options.find(o => o.letter === 'A');
                             const optB = item.options.find(o => o.letter === 'B');
                             const optC = item.options.find(o => o.letter === 'C');
-                            speakQuizItem(
-                                item.explanation,
-                                optA ? optA.text : '',
-                                optB ? optB.text : '',
-                                optC ? optC.text : '',
-                                () => {
-                                    if (isQuizReadingAllLocal) {
-                                        index++;
-                                        setTimeout(speakNext, 500);
+                            buttonElement.textContent = '⏹️';
+                            quizItemReadingIndexLocal = index;
+                            isCantoneseReadingLocal = true;
+                            speakQuizItemFull(index, item.explanation, optA ? optA.text : '', optB ? optB.text : '', optC ? optC
+                                .text : '', () => {
+                                    buttonElement.textContent = '🔊';
+                                    quizItemReadingIndexLocal = null;
+                                    isCantoneseReadingLocal = false;
+                                });
+                        }
+
+                        // 朗讀全部題目 (彈窗內 - 修復版本)
+                        let isQuizReadingAllLocal = false;
+                        let quizReadAllButtonLocal = null;
+
+                        function toggleQuizReadAllLocal(quizData, buttonElement) {
+                            if (!quizData || quizData.length === 0) return;
+                            if (isQuizReadingAllLocal && quizReadAllButtonLocal === buttonElement) {
+                                stopAllSpeechLocal();
+                                buttonElement.textContent = '🔊 朗讀全部題目';
+                                isQuizReadingAllLocal = false;
+                                quizReadAllButtonLocal = null;
+                                document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                                    if (btn.textContent !== '🔊') btn.textContent = '🔊';
+                                });
+                                return;
+                            }
+                            stopAllSpeechLocal();
+                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                                if (btn.textContent !== '🔊') btn.textContent = '🔊';
+                            });
+                            quizItemReadingIndexLocal = null;
+                            isQuizReadingAllLocal = true;
+                            quizReadAllButtonLocal = buttonElement;
+                            buttonElement.textContent = '⏹️ 停止';
+                            let index = 0;
+                            const total = quizData.length;
+
+                            function speakNext() {
+                                if (!isQuizReadingAllLocal) {
+                                    if (buttonElement) {
+                                        buttonElement.textContent = '🔊 朗讀全部題目';
+                                        isQuizReadingAllLocal = false;
+                                        quizReadAllButtonLocal = null;
+                                    }
+                                    return;
+                                }
+                                if (index >= total) {
+                                    buttonElement.textContent = '🔊 朗讀全部題目';
+                                    isQuizReadingAllLocal = false;
+                                    quizReadAllButtonLocal = null;
+                                    return;
+                                }
+                                const item = quizData[index];
+                                const optA = item.options.find(o => o.letter === 'A');
+                                const optB = item.options.find(o => o.letter === 'B');
+                                const optC = item.options.find(o => o.letter === 'C');
+                                speakQuizItemFull(index, item.explanation, optA ? optA.text : '', optB ? optB.text : '',
+                                    optC ? optC.text : '', () => {
+                                        if (isQuizReadingAllLocal) {
+                                            index++;
+                                            speakNext();
+                                        } else {
+                                            if (buttonElement) {
+                                                buttonElement.textContent = '🔊 朗讀全部題目';
+                                                isQuizReadingAllLocal = false;
+                                                quizReadAllButtonLocal = null;
+                                            }
+                                        }
+                                    });
+                            }
+                            speakNext();
+                        }
+
+                        // 渲染選擇題表格 (彈窗內)
+                        function renderQuizTableInPopup(quizItems) {
+                            const container = document.getElementById('quizContainer');
+                            if (!container) return;
+                            if (!quizItems || quizItems.length === 0) {
+                                container.innerHTML = '<p style="color:#b45f2b; text-align:center; padding:20px;">⚠️ 沒有生字資料，無法生成選擇題。</p>';
+                                return;
+                            }
+                            let total = quizItems.length;
+                            let answered = quizItems.filter(item => item.isAnswered).length;
+                            let correctCount = quizItems.filter(item => item.isAnswered && item.userAnswer === item.correctLetter).length;
+                            let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
+
+                            let html = \`
+                                <div class="quiz-stats">
+                                    <span>📊 總題數：\${total}</span>
+                                    <span>✅ 已答：\${answered}</span>
+                                    <span>🎯 正確率：\${accuracy}%</span>
+                                    <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
+                                </div>
+                                <table class="quiz-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:45px;">題號</th>
+                                            <th>解釋</th>
+                                            <th style="width:75px;">選項 A</th>
+                                            <th style="width:75px;">選項 B</th>
+                                            <th style="width:75px;">選項 C</th>
+                                            <th style="width:105px;">你的答案</th>
+                                            <th style="width:80px;">結果</th>
+                                            <th style="width:45px;">🔊</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                            \`;
+                            for (let i = 0; i < quizItems.length; i++) {
+                                const item = quizItems[i];
+                                const options = item.options;
+                                const optionA = options.find(o => o.letter === 'A');
+                                const optionB = options.find(o => o.letter === 'B');
+                                const optionC = options.find(o => o.letter === 'C');
+                                let rowClass = '';
+                                let resultDisplay = '';
+                                if (item.isAnswered) {
+                                    const isCorrect = item.userAnswer === item.correctLetter;
+                                    if (isCorrect) {
+                                        rowClass = 'correct';
+                                        resultDisplay = '✅';
+                                    } else {
+                                        rowClass = 'wrong';
+                                        resultDisplay = \`❌ (\${item.correctLetter})\`;
                                     }
                                 }
-                            );
-                        }
-                        speakNext();
-                    }
-
-                    // 渲染選擇題表格 (彈窗內)
-                    function renderQuizTableInPopup(quizItems) {
-                        const container = document.getElementById('quizContainer');
-                        if (!container) return;
-                        if (!quizItems || quizItems.length === 0) {
-                            container.innerHTML = '<p style="color:#b45f2b; text-align:center; padding:20px;">⚠️ 沒有生字資料，無法生成選擇題。</p>';
-                            return;
-                        }
-                        let total = quizItems.length;
-                        let answered = quizItems.filter(item => item.isAnswered).length;
-                        let correctCount = quizItems.filter(item => item.isAnswered && item.userAnswer === item.correctLetter).length;
-                        let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
-
-                        let html = \`
-                            <div class="quiz-stats">
-                                <span>📊 總題數：\${total}</span>
-                                <span>✅ 已答：\${answered}</span>
-                                <span>🎯 正確率：\${accuracy}%</span>
-                                <button class="quiz-mode-btn quiz-read-all-btn" id="quizReadAllBtn">🔊 朗讀全部題目</button>
-                            </div>
-                            <table class="quiz-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width:45px;">題號</th>
-                                        <th>解釋</th>
-                                        <th style="width:75px;">選項 A</th>
-                                        <th style="width:75px;">選項 B</th>
-                                        <th style="width:75px;">選項 C</th>
-                                        <th style="width:105px;">你的答案</th>
-                                        <th style="width:80px;">結果</th>
-                                        <th style="width:45px;">🔊</th>
+                                html += \`
+                                    <tr class="\${rowClass}" data-index="\${i}">
+                                        <td style="text-align:center; font-weight:bold;">\${i + 1}</td>
+                                        <td>\${item.explanation}</td>
+                                        <td>\${optionA ? optionA.text : ''}</td>
+                                        <td>\${optionB ? optionB.text : ''}</td>
+                                        <td>\${optionC ? optionC.text : ''}</td>
+                                        <td>
+                                            <select class="quiz-select" data-index="\${i}">
+                                                <option value="">請揀選</option>
+                                                <option value="A" \${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
+                                                <option value="B" \${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
+                                                <option value="C" \${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
+                                            </select>
+                                        </td>
+                                        <td style="text-align:center; font-weight:bold;">\${resultDisplay}</td>
+                                        <td style="text-align:center;">
+                                            <button class="quiz-speak-btn" data-index="\${i}">🔊</button>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                        \`;
-                        for (let i = 0; i < quizItems.length; i++) {
-                            const item = quizItems[i];
-                            const options = item.options;
-                            const optionA = options.find(o => o.letter === 'A');
-                            const optionB = options.find(o => o.letter === 'B');
-                            const optionC = options.find(o => o.letter === 'C');
-                            let rowClass = '';
-                            let resultDisplay = '';
-                            if (item.isAnswered) {
-                                const isCorrect = item.userAnswer === item.correctLetter;
-                                if (isCorrect) {
-                                    rowClass = 'correct';
-                                    resultDisplay = '✅';
-                                } else {
-                                    rowClass = 'wrong';
-                                    resultDisplay = \`❌ (\${item.correctLetter})\`;
-                                }
+                                \`;
                             }
                             html += \`
-                                <tr class="\${rowClass}" data-index="\${i}">
-                                    <td style="text-align:center; font-weight:bold;">\${i + 1}</td>
-                                    <td>\${item.explanation}</td>
-                                    <td>\${optionA ? optionA.text : ''}</td>
-                                    <td>\${optionB ? optionB.text : ''}</td>
-                                    <td>\${optionC ? optionC.text : ''}</td>
-                                    <td>
-                                        <select class="quiz-select" data-index="\${i}">
-                                            <option value="">請揀選</option>
-                                            <option value="A" \${item.userAnswer === 'A' ? 'selected' : ''}>A</option>
-                                            <option value="B" \${item.userAnswer === 'B' ? 'selected' : ''}>B</option>
-                                            <option value="C" \${item.userAnswer === 'C' ? 'selected' : ''}>C</option>
-                                        </select>
-                                    </td>
-                                    <td style="text-align:center; font-weight:bold;">\${resultDisplay}</td>
-                                    <td style="text-align:center;">
-                                        <button class="quiz-speak-btn" data-index="\${i}">🔊</button>
-                                    </td>
-                                </tr>
+                                    </tbody>
+                                </table>
                             \`;
-                        }
-                        html += \`
-                                </tbody>
-                            </table>
-                        \`;
-                        container.innerHTML = html;
+                            container.innerHTML = html;
 
-                        // 綁定下拉選單事件
-                        document.querySelectorAll('.quiz-select').forEach(select => {
-                            select.addEventListener('change', function(e) {
-                                const idx = parseInt(this.dataset.index, 10);
-                                const val = this.value;
-                                if (!val) return;
-                                if (window.quizData && window.quizData[idx]) {
-                                    window.quizData[idx].userAnswer = val;
-                                    window.quizData[idx].isAnswered = true;
+                            // 綁定下拉選單事件
+                            document.querySelectorAll('.quiz-select').forEach(select => {
+                                select.addEventListener('change', function(e) {
+                                    const idx = parseInt(this.dataset.index, 10);
+                                    const val = this.value;
+                                    if (!val) return;
+                                    if (window.quizData && window.quizData[idx]) {
+                                        window.quizData[idx].userAnswer = val;
+                                        window.quizData[idx].isAnswered = true;
+                                    }
+                                    renderQuizTableInPopup(window.quizData);
+                                });
+                            });
+
+                            // 綁定「朗讀全部」按鈕事件
+                            const readAllBtn = document.getElementById('quizReadAllBtn');
+                            if (readAllBtn) {
+                                readAllBtn.onclick = function() {
+                                    toggleQuizReadAllLocal(window.quizData, this);
+                                };
+                                if (isQuizReadingAllLocal && quizReadAllButtonLocal) {
+                                    readAllBtn.textContent = '⏹️ 停止';
                                 }
+                            }
+
+                            // 綁定逐題按鈕事件
+                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                                const idx = parseInt(btn.dataset.index, 10);
+                                btn.onclick = function() {
+                                    toggleSingleQuizReadingLocal(idx, this);
+                                };
+                                if (quizItemReadingIndexLocal === idx && isCantoneseReadingLocal) {
+                                    btn.textContent = '⏹️';
+                                } else {
+                                    btn.textContent = '🔊';
+                                }
+                            });
+                        }
+
+                        // 切換模式
+                        function switchPopupMode(mode) {
+                            const listContainer = document.getElementById('wordListContainer');
+                            const quizContainer = document.getElementById('quizContainer');
+                            const quizTitle = document.getElementById('quizTitle');
+                            const toggleBtn = document.getElementById('modeToggleBtn');
+                            const toggleFooterBtn = document.getElementById('modeToggleFooterBtn');
+                            if (mode === 'list') {
+                                listContainer.style.display = 'block';
+                                quizContainer.style.display = 'none';
+                                if (quizTitle) quizTitle.textContent = '📚 生字列表';
+                                if (toggleBtn) {
+                                    toggleBtn.textContent = '📝 選擇題';
+                                    toggleBtn.onclick = () => switchPopupMode('quiz');
+                                }
+                                if (toggleFooterBtn) {
+                                    toggleFooterBtn.textContent = '📝 選擇題';
+                                    toggleFooterBtn.onclick = () => switchPopupMode('quiz');
+                                }
+                                stopAllSpeechLocal();
+                            } else {
+                                listContainer.style.display = 'none';
+                                quizContainer.style.display = 'block';
+                                if (quizTitle) quizTitle.textContent = '📝 選擇題練習';
+                                if (toggleBtn) {
+                                    toggleBtn.textContent = '📋 返回列表';
+                                    toggleBtn.onclick = () => switchPopupMode('list');
+                                }
+                                if (toggleFooterBtn) {
+                                    toggleFooterBtn.textContent = '📋 返回列表';
+                                    toggleFooterBtn.onclick = () => switchPopupMode('list');
+                                }
+                                // 重新生成選擇題
+                                const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
+                                const daySelect = parent.document.getElementById('daySelect');
+                                const customNum = parent.document.getElementById('customDayNum');
+                                let dayFilter = null;
+                                if (daySelect) {
+                                    if (daySelect.value === 'custom') {
+                                        let val = customNum ? customNum.value.trim() : '';
+                                        if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                                    }
+                                }
+                                let filtered = [];
+                                if (!dayFilter || daySelect.value === 'all') {
+                                    filtered = [...source];
+                                } else {
+                                    filtered = source.filter(w => String(w.day) === dayFilter);
+                                }
+                                window.quizData = generateQuizData(filtered);
                                 renderQuizTableInPopup(window.quizData);
-                            });
-                        });
-
-                        // 綁定「朗讀全部」按鈕事件
-                        const readAllBtn = document.getElementById('quizReadAllBtn');
-                        if (readAllBtn) {
-                            readAllBtn.onclick = function() {
-                                toggleQuizReadAllLocal(window.quizData, this);
-                            };
-                            if (isQuizReadingAllLocal && quizReadAllButtonLocal) {
-                                readAllBtn.textContent = '⏹️ 停止';
+                                stopAllSpeechLocal();
                             }
                         }
 
-                        // 綁定逐題按鈕事件
-                        document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
-                            const idx = parseInt(btn.dataset.index, 10);
-                            btn.onclick = function() {
-                                toggleSingleQuizReadingLocal(idx, this);
-                            };
-                            if (quizItemReadingIndexLocal === idx && isCantoneseReadingLocal) {
-                                btn.textContent = '⏹️ 停止';
-                            }
-                        });
-                    }
-
-                    // 切換模式
-                    function switchPopupMode(mode) {
-                        const listContainer = document.getElementById('wordListContainer');
-                        const quizContainer = document.getElementById('quizContainer');
-                        const quizTitle = document.getElementById('quizTitle');
-                        const toggleBtn = document.getElementById('modeToggleBtn');
-                        const toggleFooterBtn = document.getElementById('modeToggleFooterBtn');
-                        if (mode === 'list') {
-                            listContainer.style.display = 'block';
-                            quizContainer.style.display = 'none';
-                            if (quizTitle) quizTitle.textContent = '📚 生字列表';
-                            if (toggleBtn) {
-                                toggleBtn.textContent = '📝 選擇題';
-                                toggleBtn.onclick = () => switchPopupMode('quiz');
-                            }
-                            if (toggleFooterBtn) {
-                                toggleFooterBtn.textContent = '📝 選擇題';
-                                toggleFooterBtn.onclick = () => switchPopupMode('quiz');
-                            }
-                            stopAllSpeechLocal();
-                        } else {
-                            listContainer.style.display = 'none';
-                            quizContainer.style.display = 'block';
-                            if (quizTitle) quizTitle.textContent = '📝 選擇題練習';
-                            if (toggleBtn) {
-                                toggleBtn.textContent = '📋 返回列表';
-                                toggleBtn.onclick = () => switchPopupMode('list');
-                            }
-                            if (toggleFooterBtn) {
-                                toggleFooterBtn.textContent = '📋 返回列表';
-                                toggleFooterBtn.onclick = () => switchPopupMode('list');
-                            }
-                            // 重新生成選擇題
-                            const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
-                            const daySelect = parent.document.getElementById('daySelect');
-                            const customNum = parent.document.getElementById('customDayNum');
-                            let dayFilter = null;
-                            if (daySelect) {
-                                if (daySelect.value === 'custom') {
-                                    let val = customNum ? customNum.value.trim() : '';
-                                    if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                        function generateQuizData(wordList) {
+                            if (!wordList || wordList.length === 0) return null;
+                            const quizItems = [];
+                            const total = wordList.length;
+                            const allChars = wordList.map(w => w.character);
+                            for (let i = 0; i < total; i++) {
+                                const correct = wordList[i];
+                                let distractors = [];
+                                const candidates = allChars.filter(ch => ch !== correct.character);
+                                if (candidates.length < 2) {
+                                    while (distractors.length < 2) {
+                                        distractors.push(candidates.length > 0 ? candidates[0] : correct.character);
+                                    }
+                                } else {
+                                    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+                                    distractors = shuffled.slice(0, 2);
                                 }
+                                const options = [
+                                    { text: correct.character, isCorrect: true },
+                                    { text: distractors[0], isCorrect: false },
+                                    { text: distractors[1], isCorrect: false }
+                                ];
+                                const shuffledOptions = options.sort(() => Math.random() - 0.5);
+                                let correctLetter = '';
+                                const letters = ['A', 'B', 'C'];
+                                for (let idx = 0; idx < shuffledOptions.length; idx++) {
+                                    if (shuffledOptions[idx].isCorrect) {
+                                        correctLetter = letters[idx];
+                                        break;
+                                    }
+                                }
+                                quizItems.push({
+                                    index: i,
+                                    explanation: correct.explanation || '',
+                                    correctChar: correct.character,
+                                    correctLetter: correctLetter,
+                                    options: shuffledOptions.map((opt, idx) => ({
+                                        letter: letters[idx],
+                                        text: opt.text,
+                                        isCorrect: opt.isCorrect
+                                    })),
+                                    userAnswer: null,
+                                    isAnswered: false
+                                });
                             }
-                            let filtered = [];
-                            if (!dayFilter || daySelect.value === 'all') {
-                                filtered = [...source];
-                            } else {
-                                filtered = source.filter(w => String(w.day) === dayFilter);
-                            }
-                            window.quizData = generateQuizData(filtered);
-                            renderQuizTableInPopup(window.quizData);
-                            stopAllSpeechLocal();
+                            return quizItems;
                         }
-                    }
 
-                    function generateQuizData(wordList) {
-                        if (!wordList || wordList.length === 0) return null;
-                        const quizItems = [];
-                        const total = wordList.length;
-                        const allChars = wordList.map(w => w.character);
-                        for (let i = 0; i < total; i++) {
-                            const correct = wordList[i];
-                            let distractors = [];
-                            const candidates = allChars.filter(ch => ch !== correct.character);
-                            if (candidates.length < 2) {
-                                while (distractors.length < 2) {
-                                    distractors.push(candidates.length > 0 ? candidates[0] : correct.character);
+                        // 初始化
+                        window.onload = function() {
+                            if (!window.quizData) {
+                                const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
+                                const daySelect = parent.document.getElementById('daySelect');
+                                const customNum = parent.document.getElementById('customDayNum');
+                                let dayFilter = null;
+                                if (daySelect) {
+                                    if (daySelect.value === 'custom') {
+                                        let val = customNum ? customNum.value.trim() : '';
+                                        if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
+                                    }
                                 }
-                            } else {
-                                const shuffled = [...candidates].sort(() => Math.random() - 0.5);
-                                distractors = shuffled.slice(0, 2);
-                            }
-                            const options = [
-                                { text: correct.character, isCorrect: true },
-                                { text: distractors[0], isCorrect: false },
-                                { text: distractors[1], isCorrect: false }
-                            ];
-                            const shuffledOptions = options.sort(() => Math.random() - 0.5);
-                            let correctLetter = '';
-                            const letters = ['A', 'B', 'C'];
-                            for (let idx = 0; idx < shuffledOptions.length; idx++) {
-                                if (shuffledOptions[idx].isCorrect) {
-                                    correctLetter = letters[idx];
-                                    break;
+                                let filtered = [];
+                                if (!dayFilter || daySelect.value === 'all') {
+                                    filtered = [...source];
+                                } else {
+                                    filtered = source.filter(w => String(w.day) === dayFilter);
                                 }
+                                window.quizData = generateQuizData(filtered);
                             }
-                            quizItems.push({
-                                index: i,
-                                explanation: correct.explanation || '',
-                                correctChar: correct.character,
-                                correctLetter: correctLetter,
-                                options: shuffledOptions.map((opt, idx) => ({
-                                    letter: letters[idx],
-                                    text: opt.text,
-                                    isCorrect: opt.isCorrect
-                                })),
-                                userAnswer: null,
-                                isAnswered: false
-                            });
-                        }
-                        return quizItems;
-                    }
-
-                    // 初始化
-                    window.onload = function() {
-                        if (!window.quizData) {
-                            const source = (window.currentWordSet === "must") ? window.allMustWords : window.allOnlyWords;
-                            const daySelect = parent.document.getElementById('daySelect');
-                            const customNum = parent.document.getElementById('customDayNum');
-                            let dayFilter = null;
-                            if (daySelect) {
-                                if (daySelect.value === 'custom') {
-                                    let val = customNum ? customNum.value.trim() : '';
-                                    if (val && !isNaN(Number(val))) dayFilter = String(Number(val));
-                                }
-                            }
-                            let filtered = [];
-                            if (!dayFilter || daySelect.value === 'all') {
-                                filtered = [...source];
-                            } else {
-                                filtered = source.filter(w => String(w.day) === dayFilter);
-                            }
-                            window.quizData = generateQuizData(filtered);
-                        }
-                        document.getElementById('wordListContainer').style.display = 'block';
-                        document.getElementById('quizContainer').style.display = 'none';
-                        document.getElementById('modeToggleBtn').onclick = () => switchPopupMode('quiz');
-                        document.getElementById('modeToggleFooterBtn').onclick = () => switchPopupMode('quiz');
-                    };
-                <\/script>
-            </body>
-            </html>
-        `;
+                            document.getElementById('wordListContainer').style.display = 'block';
+                            document.getElementById('quizContainer').style.display = 'none';
+                            document.getElementById('modeToggleBtn').onclick = () => switchPopupMode('quiz');
+                            document.getElementById('modeToggleFooterBtn').onclick = () => switchPopupMode('quiz');
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
 
             const win = window.open("", "_blank", "width=900,height=750,scrollbars=yes");
             if (win) {
@@ -1856,7 +1899,6 @@
                 if (!currentFilteredWords.length) return;
                 const w = currentFilteredWords[currentWordIndex];
                 if (w && w.character) {
-                    // 使用 speakThreeTimes 但改為直接朗讀三次
                     if (isCantoneseReading && currentCantoneseButton === document.getElementById("readWordThreeBtn")) {
                         stopAllSpeech();
                         return;
