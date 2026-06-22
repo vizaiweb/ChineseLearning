@@ -610,13 +610,36 @@
     }
 }
 
-        // ---------- 【核心】單句朗讀（共用核心） ----------
-        // 朗讀單一題目 (題號 + 解釋內容 + 選項，不讀『解釋』二字)
-        function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
-            const text =
-                `題號${index + 1}。${explanation}。選項A：${optA}，選項B：${optB}，選項C：${optC}。`;
-            speakCantoneseOnce(text, onEnd);
+    
+      // ---------- 【核心】單句朗讀（分段循序朗讀） ----------
+// 朗讀單一題目 (分段：題號+解釋 → 選項A → 選項B → 選項C)
+// 全部讀完後才觸發 onEnd，確保按鈕不會提前還原
+function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
+    // 將內容分成四個短句，確保每段都是完整的語意單元
+    const parts = [
+        `題號${index + 1}。${explanation}`,
+        `選項A：${optA}`,
+        `選項B：${optB}`,
+        `選項C：${optC}`
+    ];
+    
+    let currentIndex = 0;
+    
+    function speakNext() {
+        // 所有段落都讀完了 → 觸發最終回調，還原按鈕
+        if (currentIndex >= parts.length) {
+            if (onEnd) onEnd();
+            return;
         }
+        // 朗讀當前段落，完成後繼續下一段
+        speakCantoneseOnce(parts[currentIndex], () => {
+            currentIndex++;
+            speakNext();
+        });
+    }
+    
+    speakNext();
+}
 
         // ---------- 共用停止函數 ----------
         function stopAllSpeech() {
