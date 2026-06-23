@@ -256,20 +256,15 @@
             word-break: break-word;
             color: #2c3a1f;
         }
-        /* 文章解釋區域樣式 - 保留底色，統一四邊邊框 */
+        /* 文章解釋區域樣式 - 統一邊框，分層內距 */
         .article-explanation-box {
             background: #f7f2e8;
             border-radius: 28px;
-            padding: 18px;
             margin-top: 4px;
             margin-bottom: 16px;
             border: 1px solid #ffe0b0;
-            font-size: 16px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-            color: #3d4a2f;
-            /* 已移除 border-left: 6px solid #ffaa66; 使四邊邊框與文章內容一致 */
+            overflow: hidden;
+            /* 確保圓角與內層一致 */
         }
         .article-explanation-header {
             display: flex;
@@ -277,7 +272,12 @@
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 10px;
-            margin-bottom: 8px;
+            padding: 10px 18px;
+            /* 標題列內距 */
+            border-bottom: 1px solid #ffe0b0;
+            /* 與內容區分隔 */
+            background: #f7f2e8;
+            /* 確保與外層背景一致 */
         }
         .article-explanation-title {
             font-size: 18px;
@@ -286,6 +286,17 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+        .article-explanation-content {
+            padding: 12px 18px;
+            /* 內容區內距，上下稍小以減少空白 */
+            font-size: 16px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #3d4a2f;
+            background: #f7f2e8;
+            /* 與外層背景一致 */
         }
         .article-nav-footer {
             display: flex;
@@ -450,9 +461,12 @@
                 font-size: 16px;
                 padding: 2px 4px;
             }
-            .article-explanation-box {
+            .article-explanation-header {
+                padding: 8px 14px;
+            }
+            .article-explanation-content {
+                padding: 10px 14px;
                 font-size: 14px;
-                padding: 14px;
             }
             .article-explanation-title {
                 font-size: 16px;
@@ -519,13 +533,13 @@
                 <div id="articleContentBox" class="article-content-box">
                     請選擇文章
                 </div>
-                <!-- 新增文章解釋區域 -->
+                <!-- 文章解釋區域 - 調整為統一邊框、分層內距 -->
                 <div id="articleExplanationBox" class="article-explanation-box" style="display: none;">
                     <div class="article-explanation-header">
                         <span class="article-explanation-title">📖 文章解釋</span>
                         <button id="readExplanationBtn" class="btn-icon" style="padding: 4px 16px; font-size: 14px;">🔊 朗讀解釋</button>
                     </div>
-                    <div id="articleExplanationContent">解釋內容將顯示在這裡</div>
+                    <div id="articleExplanationContent" class="article-explanation-content">解釋內容將顯示在這裡</div>
                 </div>
                 <!-- 已移除 上一篇/下一篇 按鈕 -->
             </div>
