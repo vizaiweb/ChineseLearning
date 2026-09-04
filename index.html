@@ -88,25 +88,28 @@
             flex-wrap: wrap;
         }
         .tab-btn {
-            background: #cfb284;
-            flex: 1;
-            text-align: center;
-            border: none;
-            border-radius: 40px;
-            padding: 10px 0;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-            font-family: inherit;
-            transition: 0.2s;
-        }
-        .tab-btn.active {
-            background: #ff7a3c;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
+    background: #e8e0d6;          /* 未選中：淺灰色背景 */
+    flex: 1;
+    text-align: center;
+    border: none;
+    border-radius: 16px;           /* 較大的圓角 */
+    padding: 14px 8px;            /* 增加上下內距，讓按鈕更高 */
+    color: #8b7a66;               /* 未選中：灰色文字 */
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 18px;              /* 字體放大 */
+    font-family: inherit;
+    transition: 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+       .tab-btn.active {
+    background: #ff7a3c;           /* 鮮明的橘色背景 */
+    color: white;                  /* 白色文字 */
+    box-shadow: 0 4px 12px rgba(255, 122, 60, 0.4); /* 橘色外光暈 */
+    transform: scale(1.02);        /* 微微放大 */
+}
         .tab-btn:active {
-            transform: scale(0.96);
+            transform: scale(0.97);
         }
         .practice-card {
             background: white;
@@ -471,6 +474,11 @@
             .article-explanation-title {
                 font-size: 16px;
             }
+            .tab-btn {
+        font-size: 15px;
+        padding: 12px 6px;
+        border-radius: 12px;
+    }
         }
     </style>
 </head>
