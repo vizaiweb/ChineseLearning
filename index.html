@@ -1004,7 +1004,8 @@
             });
         }
 
-        // 【修改】朗讀文章解釋 - 使用取消標記，並優化文字清理
+    
+// 【修改】朗讀文章解釋 - 分段朗讀，確保完整讀完
 function readExplanationOnce() {
     if (!articles.length) return;
     const art = articles[currentArticleIndex];
@@ -1013,7 +1014,6 @@ function readExplanationOnce() {
         return;
     }
     const button = document.getElementById("readExplanationBtn");
-    // 如果正在朗讀且是同一按鈕，則停止
     if (isCantoneseReading && currentCantoneseButton === button) {
         stopAllSpeech();
         return;
@@ -1024,28 +1024,55 @@ function readExplanationOnce() {
     button.classList.add('reading-disabled');
     isCantoneseReading = true;
 
-    // 【優化】清理解釋文字，合併連續標點，避免語音引擎異常停頓
-    let cleanExplanation = art.explanation
-        .replace(/[\n\r]+/g, '。')   // 換行轉為句號
-        .replace(/\s+/g, ' ')        // 多個空格轉為單個
-        .replace(/[。]+/g, '。')      // 【關鍵修復】將連續句號合併為一個
-        .trim();                     // 移除首尾空格
+    // 清理文字並按句號分段
+    let cleanText = art.explanation
+        .replace(/[\n\r]+/g, '。')
+        .replace(/\s+/g, ' ')
+        .replace(/[。]+/g, '。')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[【】\[\]]/g, '')
+        .trim();
 
-    // 如果解釋內容太短（少於5個字），加入適當停頓，避免語音引擎異常
-    if (cleanExplanation.length < 5) {
-        cleanExplanation = cleanExplanation + '。';
+    // 按句號分段
+    let segments = cleanText.split('。').filter(s => s.trim().length > 0);
+    // 如果沒有句號，則整個作為一段
+    if (segments.length === 0) {
+        segments = [cleanText];
     }
+    // 在每段結尾加上句號
+    segments = segments.map(s => s.trim() + '。');
 
-    ensureCantoneseEngine(() => {
-        // 保存取消函數
-        currentCancelFunction = speakCantoneseOnce(cleanExplanation, () => {
+    let currentIndex = 0;
+
+    function speakNextSegment() {
+        if (!isCantoneseReading) {
+            // 如果被中斷，重置按鈕
             button.textContent = "🔊 朗讀解釋";
             button.classList.remove('reading-disabled');
             isCantoneseReading = false;
             currentCantoneseButton = null;
             currentCancelFunction = null;
+            return;
+        }
+        if (currentIndex >= segments.length) {
+            // 全部讀完，重置按鈕
+            button.textContent = "🔊 朗讀解釋";
+            button.classList.remove('reading-disabled');
+            isCantoneseReading = false;
+            currentCantoneseButton = null;
+            currentCancelFunction = null;
+            return;
+        }
+        const text = segments[currentIndex];
+        currentIndex++;
+        // 分段朗讀
+        currentCancelFunction = speakCantoneseOnce(text, () => {
+            // 每段之間間隔 300ms
+            setTimeout(speakNextSegment, 300);
         });
-    });
+    }
+
+    ensureCantoneseEngine(speakNextSegment);
 }
 
         // ====================== 【核心】選擇題模式 (保持不變) ======================
