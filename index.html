@@ -1028,11 +1028,6 @@
             let cleanExplanation = art.explanation
                 .replace(/[\n\r]+/g, '。') // 換行轉為句號
                 .replace(/\s+/g, ' ') // 多個空格轉為單個
-                .replace(/[，,、]+/g, '，') // 統一逗號
-                .replace(/[；;]+/g, '；') // 統一逗號
-                .replace(/[：:]+/g, '：') // 統一冒號
-                .replace(/[！!]+/g, '！') // 統一驚嘆號
-                .replace(/[？?]+/g, '？') // 統一問號
                 .trim(); // 移除首尾空格
 
             // 如果解釋內容太短（少於5個字），加入適當停頓，避免語音引擎異常
