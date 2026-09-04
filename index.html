@@ -1004,48 +1004,49 @@
             });
         }
 
-        // 【修改】朗讀文章解釋 - 使用取消標記，並清理解釋文字
-        function readExplanationOnce() {
-            if (!articles.length) return;
-            const art = articles[currentArticleIndex];
-            if (!art.explanation || art.explanation.trim() === '') {
-                alert("此文章沒有解釋內容");
-                return;
-            }
-            const button = document.getElementById("readExplanationBtn");
-            // 如果正在朗讀且是同一按鈕，則停止
-            if (isCantoneseReading && currentCantoneseButton === button) {
-                stopAllSpeech();
-                return;
-            }
-            stopAllSpeech();
-            currentCantoneseButton = button;
-            button.textContent = "⏹️ 停止";
-            button.classList.add('reading-disabled');
-            isCantoneseReading = true;
+        // 【修改】朗讀文章解釋 - 使用取消標記，並優化文字清理
+function readExplanationOnce() {
+    if (!articles.length) return;
+    const art = articles[currentArticleIndex];
+    if (!art.explanation || art.explanation.trim() === '') {
+        alert("此文章沒有解釋內容");
+        return;
+    }
+    const button = document.getElementById("readExplanationBtn");
+    // 如果正在朗讀且是同一按鈕，則停止
+    if (isCantoneseReading && currentCantoneseButton === button) {
+        stopAllSpeech();
+        return;
+    }
+    stopAllSpeech();
+    currentCantoneseButton = button;
+    button.textContent = "⏹️ 停止";
+    button.classList.add('reading-disabled');
+    isCantoneseReading = true;
 
-            // 【關鍵】清理解釋文字，移除可能干擾語音引擎的特殊字符
-            let cleanExplanation = art.explanation
-                .replace(/[\n\r]+/g, '。') // 換行轉為句號
-                .replace(/\s+/g, ' ') // 多個空格轉為單個
-                .trim(); // 移除首尾空格
+    // 【優化】清理解釋文字，合併連續標點，避免語音引擎異常停頓
+    let cleanExplanation = art.explanation
+        .replace(/[\n\r]+/g, '。')   // 換行轉為句號
+        .replace(/\s+/g, ' ')        // 多個空格轉為單個
+        .replace(/[。]+/g, '。')      // 【關鍵修復】將連續句號合併為一個
+        .trim();                     // 移除首尾空格
 
-            // 如果解釋內容太短（少於5個字），加入適當停頓，避免語音引擎異常
-            if (cleanExplanation.length < 5) {
-                cleanExplanation = cleanExplanation + '。';
-            }
+    // 如果解釋內容太短（少於5個字），加入適當停頓，避免語音引擎異常
+    if (cleanExplanation.length < 5) {
+        cleanExplanation = cleanExplanation + '。';
+    }
 
-            ensureCantoneseEngine(() => {
-                // 保存取消函數
-                currentCancelFunction = speakCantoneseOnce(cleanExplanation, () => {
-                    button.textContent = "🔊 朗讀解釋";
-                    button.classList.remove('reading-disabled');
-                    isCantoneseReading = false;
-                    currentCantoneseButton = null;
-                    currentCancelFunction = null;
-                });
-            });
-        }
+    ensureCantoneseEngine(() => {
+        // 保存取消函數
+        currentCancelFunction = speakCantoneseOnce(cleanExplanation, () => {
+            button.textContent = "🔊 朗讀解釋";
+            button.classList.remove('reading-disabled');
+            isCantoneseReading = false;
+            currentCantoneseButton = null;
+            currentCancelFunction = null;
+        });
+    });
+}
 
         // ====================== 【核心】選擇題模式 (保持不變) ======================
         let currentQuizData = null;
