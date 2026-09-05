@@ -1419,27 +1419,34 @@
 
         // 載入指定句子
         function loadBuilderSentence(index) {
-            if (!builderState.sentences || builderState.sentences.length === 0) return;
-            if (index < 0) index = 0;
-            if (index >= builderState.sentences.length) index = builderState.sentences.length - 1;
+    if (!builderState.sentences || builderState.sentences.length === 0) return;
+    if (index < 0) index = 0;
+    if (index >= builderState.sentences.length) index = builderState.sentences.length - 1;
 
-            builderState.currentIndex = index;
-            const sentence = builderState.sentences[index];
-            builderState.correctSentence = sentence;
-            // 按字分割（保留標點符號作為獨立單元）
-            const chars = sentence.split('');
-            builderState.sourceChars = shuffleArray(chars);
-            builderState.targetChars = chars.map(() => null);
-            builderState.isAnswered = false;
+    builderState.currentIndex = index;
+    const sentence = builderState.sentences[index];
+    builderState.correctSentence = sentence;
+    const chars = sentence.split('');
+    builderState.sourceChars = shuffleArray(chars);
+    builderState.targetChars = chars.map(() => null);
+    builderState.isAnswered = false;
 
-            // 更新提示
-            document.getElementById('hintText').textContent = `📖 ${sentence}`;
-            document.getElementById('totalSentences').textContent = builderState.totalCount;
-            renderBuilder();
-            updateBuilderStats();
-            document.getElementById('feedbackMsg').textContent = '💡 將下方單字拖曳到上方答案區';
-            document.getElementById('feedbackMsg').className = 'builder-feedback';
-        }
+    // 加入防錯檢查
+    const hintEl = document.getElementById('hintText');
+    if (hintEl) hintEl.textContent = `📖 ${sentence}`;
+    
+    const totalEl = document.getElementById('totalSentences');
+    if (totalEl) totalEl.textContent = builderState.totalCount;
+    
+    renderBuilder();
+    updateBuilderStats();
+    
+    const feedback = document.getElementById('feedbackMsg');
+    if (feedback) {
+        feedback.textContent = '💡 將下方單字拖曳到上方答案區';
+        feedback.className = 'builder-feedback';
+    }
+}
 
         // 渲染練習區
         function renderBuilder() {
