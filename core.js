@@ -297,6 +297,20 @@ function bindCoreEvents() {
         });
     }
 
+    // 在 bindCoreEvents 函數的末尾，加入自動載入邏輯
+// 如果 levelSelect 有預設值，自動載入檔案清單
+const levelSelect = document.getElementById('levelSelect');
+if (levelSelect) {
+    const defaultLevel = levelSelect.value || 'P2';
+    if (defaultLevel) {
+        // 延遲執行，確保 DOM 完全載入
+        setTimeout(() => {
+            currentLevel = defaultLevel;
+            loadFileListByLevel(defaultLevel);
+        }, 300);
+    }
+}
+    
     // ===== 自動載入儲存的進度 =====
     const savedLevel = localStorage.getItem('savedLevel');
     const savedFile = localStorage.getItem('savedFile');
