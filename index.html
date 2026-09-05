@@ -1244,20 +1244,22 @@
             stopAllSpeech();
 
             // 更新句子重組練習
-            if (art.content) {
-                const sentences = extractSentences(art.content);
-                if (sentences.length > 0) {
-                    document.getElementById("builderContainer").style.display = 'block';
-                    builderState.sentences = sentences;
-                    builderState.totalCount = sentences.length;
-                    builderState.currentIndex = 0;
-                    builderState.stats = { total: 0, correct: 0 };
-                    loadBuilderSentence(0);
-                    updateBuilderStats();
-                } else {
-                    document.getElementById("builderContainer").style.display = 'none';
-                }
-            } else {
+            if (art.content && art.content.trim() !== '') {
+        const sentences = extractSentences(art.content);
+        if (sentences.length > 0) {
+            document.getElementById("builderContainer").style.display = 'block';
+            builderState.sentences = sentences;
+            builderState.totalCount = sentences.length;
+            builderState.currentIndex = 0;
+            builderState.stats = { total: 0, correct: 0 };
+            loadBuilderSentence(0);
+            updateBuilderStats();
+        } else {
+            document.getElementById("builderContainer").style.display = 'none';
+        }
+    } else {
+        document.getElementById("builderContainer").style.display = 'none';
+    } else {
                 document.getElementById("builderContainer").style.display = 'none';
             }
 
@@ -1396,25 +1398,26 @@
 
         // 初始化練習（從文章載入）
         function initBuilderFromArticle(article) {
-            if (!article || !article.content) {
-                document.getElementById("builderContainer").style.display = 'none';
-                return;
-            }
-            const sentences = extractSentences(article.content);
-            if (sentences.length === 0) {
-                document.getElementById("builderContainer").style.display = 'none';
-                return;
-            }
-            document.getElementById("builderContainer").style.display = 'block';
-            builderState.sentences = sentences;
-            builderState.totalCount = sentences.length;
-            builderState.currentIndex = 0;
-            builderState.stats = { total: 0, correct: 0 };
-            builderState.isOpen = false;
-            document.getElementById("builderContent").classList.remove('open');
-            loadBuilderSentence(0);
-            updateBuilderStats();
-        }
+    // 如果沒有文章或文章內容為空，隱藏練習區並返回
+    if (!article || !article.content || article.content.trim() === '') {
+        document.getElementById("builderContainer").style.display = 'none';
+        return;
+    }
+    const sentences = extractSentences(article.content);
+    if (sentences.length === 0) {
+        document.getElementById("builderContainer").style.display = 'none';
+        return;
+    }
+    document.getElementById("builderContainer").style.display = 'block';
+    builderState.sentences = sentences;
+    builderState.totalCount = sentences.length;
+    builderState.currentIndex = 0;
+    builderState.stats = { total: 0, correct: 0 };
+    builderState.isOpen = false;
+    document.getElementById("builderContent").classList.remove('open');
+    loadBuilderSentence(0);
+    updateBuilderStats();
+}
 
         // 載入指定句子
         function loadBuilderSentence(index) {
