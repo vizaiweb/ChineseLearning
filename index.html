@@ -376,6 +376,7 @@
             font-weight: 700;
         }
 
+        /* 提示句子區域 - 新增顯示/隱藏功能 */
         .builder-hint {
             background: #fffcf0;
             padding: 12px 16px;
@@ -389,13 +390,55 @@
             border: 1px solid #ffe0b0;
         }
 
-        .builder-hint .hint-text {
+        .hint-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .hint-text {
             font-size: 18px;
             color: #2c3a1f;
             font-weight: 500;
+            transition: all 0.3s ease;
         }
 
-        .builder-hint .listen-btn {
+        .hint-text.hidden {
+            filter: blur(5px);
+            user-select: none;
+            opacity: 0.6;
+        }
+
+        .hint-controls {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .hint-toggle-btn {
+            background: none;
+            border: 1px solid #d4c5a9;
+            border-radius: 30px;
+            padding: 4px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #8b6946;
+            font-weight: 500;
+        }
+
+        .hint-toggle-btn:hover {
+            background: #f0e8d8;
+        }
+
+        .hint-toggle-btn:active {
+            transform: scale(0.95);
+        }
+
+        .listen-btn {
             background: none;
             border: none;
             font-size: 22px;
@@ -405,11 +448,11 @@
             transition: 0.2s;
         }
 
-        .builder-hint .listen-btn:hover {
+        .listen-btn:hover {
             background: #f0e8d8;
         }
 
-        .builder-hint .listen-btn:active {
+        .listen-btn:active {
             transform: scale(0.9);
         }
 
@@ -729,8 +772,15 @@
             .builder-header .stats {
                 font-size: 12px;
             }
-            .builder-hint .hint-text {
+            .builder-hint {
+                padding: 10px 12px;
+            }
+            .hint-text {
                 font-size: 16px;
+            }
+            .hint-toggle-btn {
+                font-size: 12px;
+                padding: 2px 10px;
             }
             .char-token {
                 font-size: 18px;
@@ -823,10 +873,18 @@
                             <span class="title">✏️ 句子重組練習</span>
                             <span class="stats" id="builderStats">📌 第 <span class="stat-number">1</span> / <span class="stat-number" id="totalSentences">0</span> 句 &nbsp;| ✅ 答對率: <span class="stat-number" id="accuracyDisplay">--%</span></span>
                         </div>
+
+                        <!-- 提示句子區域 - 新增顯示/隱藏功能 -->
                         <div class="builder-hint">
-                            <span class="hint-text" id="hintText">📖 提示句子將顯示在這裡</span>
-                            <button class="listen-btn" id="listenHintBtn" title="朗讀提示句子">🔊</button>
+                            <div class="hint-left">
+                                <span class="hint-text" id="hintText">📖 提示句子將顯示在這裡</span>
+                            </div>
+                            <div class="hint-controls">
+                                <button class="hint-toggle-btn" id="toggleHintBtn">👁️ 隱藏</button>
+                                <button class="listen-btn" id="listenHintBtn" title="朗讀提示句子">🔊</button>
+                            </div>
                         </div>
+
                         <div class="builder-source-area">
                             <div class="builder-dropzone source-dropzone" id="sourceDropzone">
                                 <!-- 來源字卡由 JS 生成 -->
@@ -895,7 +953,8 @@
             isAnswered: false,
             stats: { total: 0, correct: 0 },
             correctSentence: '',
-            dragData: null
+            dragData: null,
+            isHintVisible: true // 新增：提示句子顯示狀態
         };
 
         // ---------- 語音引擎 ----------
@@ -1121,7 +1180,6 @@
                 if (articles.length > 0) {
                     currentArticleIndex = 0;
                     showArticle(0);
-                    // 初始化句子重組練習
                     initBuilderFromArticle(articles[0]);
                 } else {
                     document.getElementById("articleContentBox").innerHTML = "📭 沒有文章資料";
@@ -1245,21 +1303,24 @@
 
             // 更新句子重組練習
             if (art.content && art.content.trim() !== '') {
-        const sentences = extractSentences(art.content);
-        if (sentences.length > 0) {
-            document.getElementById("builderContainer").style.display = 'block';
-            builderState.sentences = sentences;
-            builderState.totalCount = sentences.length;
-            builderState.currentIndex = 0;
-            builderState.stats = { total: 0, correct: 0 };
-            loadBuilderSentence(0);
-            updateBuilderStats();
-        } else {
-            document.getElementById("builderContainer").style.display = 'none';
-        }
-    } else {
-        document.getElementById("builderContainer").style.display = 'none';
-    } 
+                const sentences = extractSentences(art.content);
+                if (sentences.length > 0) {
+                    document.getElementById("builderContainer").style.display = 'block';
+                    builderState.sentences = sentences;
+                    builderState.totalCount = sentences.length;
+                    builderState.currentIndex = 0;
+                    builderState.stats = { total: 0, correct: 0 };
+                    builderState.isOpen = false;
+                    builderState.isHintVisible = true; // 重置提示為顯示
+                    document.getElementById("builderContent").classList.remove('open');
+                    loadBuilderSentence(0);
+                    updateBuilderStats();
+                } else {
+                    document.getElementById("builderContainer").style.display = 'none';
+                }
+            } else {
+                document.getElementById("builderContainer").style.display = 'none';
+            }
 
             // 如果練習區是關閉的，隱藏內容
             if (!builderState.isOpen) {
@@ -1377,10 +1438,8 @@
 
         // 從文章內容提取句子
         function extractSentences(content) {
-            if (!content) return [];
-            // 按句號、逗號、頓號、換行分割，過濾空白
+            if (!content || typeof content !== 'string') return [];
             const raw = content.split(/[。，、\n\r]+/).filter(s => s.trim().length > 0);
-            // 保留標點符號（在每個句子末尾加上原本的標點，但我們只取純文字）
             return raw.map(s => s.trim());
         }
 
@@ -1396,57 +1455,84 @@
 
         // 初始化練習（從文章載入）
         function initBuilderFromArticle(article) {
-    // 如果沒有文章或文章內容為空，隱藏練習區並返回
-    if (!article || !article.content || article.content.trim() === '') {
-        document.getElementById("builderContainer").style.display = 'none';
-        return;
-    }
-    const sentences = extractSentences(article.content);
-    if (sentences.length === 0) {
-        document.getElementById("builderContainer").style.display = 'none';
-        return;
-    }
-    document.getElementById("builderContainer").style.display = 'block';
-    builderState.sentences = sentences;
-    builderState.totalCount = sentences.length;
-    builderState.currentIndex = 0;
-    builderState.stats = { total: 0, correct: 0 };
-    builderState.isOpen = false;
-    document.getElementById("builderContent").classList.remove('open');
-    loadBuilderSentence(0);
-    updateBuilderStats();
-}
+            if (!article || !article.content || article.content.trim() === '') {
+                document.getElementById("builderContainer").style.display = 'none';
+                return;
+            }
+            const sentences = extractSentences(article.content);
+            if (sentences.length === 0) {
+                document.getElementById("builderContainer").style.display = 'none';
+                return;
+            }
+            document.getElementById("builderContainer").style.display = 'block';
+            builderState.sentences = sentences;
+            builderState.totalCount = sentences.length;
+            builderState.currentIndex = 0;
+            builderState.stats = { total: 0, correct: 0 };
+            builderState.isOpen = false;
+            builderState.isHintVisible = true;
+            document.getElementById("builderContent").classList.remove('open');
+            loadBuilderSentence(0);
+            updateBuilderStats();
+        }
 
         // 載入指定句子
         function loadBuilderSentence(index) {
-    if (!builderState.sentences || builderState.sentences.length === 0) return;
-    if (index < 0) index = 0;
-    if (index >= builderState.sentences.length) index = builderState.sentences.length - 1;
+            if (!builderState.sentences || builderState.sentences.length === 0) return;
+            if (index < 0) index = 0;
+            if (index >= builderState.sentences.length) index = builderState.sentences.length - 1;
 
-    builderState.currentIndex = index;
-    const sentence = builderState.sentences[index];
-    builderState.correctSentence = sentence;
-    const chars = sentence.split('');
-    builderState.sourceChars = shuffleArray(chars);
-    builderState.targetChars = chars.map(() => null);
-    builderState.isAnswered = false;
+            builderState.currentIndex = index;
+            const sentence = builderState.sentences[index];
+            if (!sentence || typeof sentence !== 'string') {
+                console.warn('loadBuilderSentence: 無效的句子:', sentence);
+                return;
+            }
+            builderState.correctSentence = sentence;
+            const chars = sentence.split('');
+            builderState.sourceChars = shuffleArray(chars);
+            builderState.targetChars = chars.map(() => null);
+            builderState.isAnswered = false;
+            builderState.isHintVisible = true; // 重置提示為顯示
 
-    // 加入防錯檢查
-    const hintEl = document.getElementById('hintText');
-    if (hintEl) hintEl.textContent = `📖 ${sentence}`;
-    
-    const totalEl = document.getElementById('totalSentences');
-    if (totalEl) totalEl.textContent = builderState.totalCount;
-    
-    renderBuilder();
-    updateBuilderStats();
-    
-    const feedback = document.getElementById('feedbackMsg');
-    if (feedback) {
-        feedback.textContent = '💡 將下方單字拖曳到上方答案區';
-        feedback.className = 'builder-feedback';
-    }
-}
+            // 更新提示
+            const hintEl = document.getElementById('hintText');
+            if (hintEl) hintEl.textContent = `📖 ${sentence}`;
+            const totalEl = document.getElementById('totalSentences');
+            if (totalEl) totalEl.textContent = builderState.totalCount;
+
+            renderBuilder();
+            updateBuilderStats();
+            const feedback = document.getElementById('feedbackMsg');
+            if (feedback) {
+                feedback.textContent = '💡 將下方單字拖曳到上方答案區';
+                feedback.className = 'builder-feedback';
+            }
+
+            // 更新提示顯示狀態
+            updateHintVisibility();
+        }
+
+        // 更新提示句子顯示/隱藏狀態
+        function updateHintVisibility() {
+            const hintEl = document.getElementById('hintText');
+            const toggleBtn = document.getElementById('toggleHintBtn');
+            if (!hintEl || !toggleBtn) return;
+
+            if (builderState.isHintVisible) {
+                hintEl.classList.remove('hidden');
+                toggleBtn.textContent = '👁️ 隱藏';
+            } else {
+                hintEl.classList.add('hidden');
+                toggleBtn.textContent = '🙈 顯示';
+            }
+        }
+
+        // 切換提示句子顯示/隱藏
+        function toggleHintVisibility() {
+            builderState.isHintVisible = !builderState.isHintVisible;
+            updateHintVisibility();
+        }
 
         // 渲染練習區
         function renderBuilder() {
@@ -1479,6 +1565,9 @@
             if (nextBtn) {
                 nextBtn.disabled = (builderState.currentIndex >= builderState.totalCount - 1);
             }
+
+            // 更新提示顯示狀態
+            updateHintVisibility();
 
             // 綁定拖曳事件
             bindDragEvents();
@@ -1531,7 +1620,6 @@
                 builderState.stats.correct++;
                 document.getElementById('feedbackMsg').textContent = '✅ 完全正確！';
                 document.getElementById('feedbackMsg').className = 'builder-feedback correct';
-                // 播放正確音效
                 playBeep(880, 0.2);
                 setTimeout(() => { playBeep(1100, 0.15); }, 150);
             } else {
@@ -1540,7 +1628,6 @@
                 playBeep(440, 0.4);
             }
             updateBuilderStats();
-            // 重新渲染以更新目標區樣式（但保留目標區內容）
             renderBuilder();
         }
 
@@ -1549,7 +1636,6 @@
             if (builderState.currentIndex < builderState.totalCount - 1) {
                 builderState.currentIndex++;
                 loadBuilderSentence(builderState.currentIndex);
-                // 重新渲染
                 renderBuilder();
                 updateBuilderStats();
             }
@@ -1558,22 +1644,15 @@
         // 重排
         function shuffleChars() {
             if (builderState.isAnswered) {
-                // 如果已作答，重置狀態
                 builderState.isAnswered = false;
                 document.getElementById('feedbackMsg').textContent = '💡 將下方單字拖曳到上方答案區';
                 document.getElementById('feedbackMsg').className = 'builder-feedback';
             }
-            // 只重新打亂來源區中尚未放置的文字
-            const currentTarget = builderState.targetChars;
-            const placedChars = currentTarget.filter(c => c !== null);
-            // 從來源區移除已放置的文字（其實來源區已經不包含已放置的文字）
-            // 但為了正確，我們重新構建來源區
             const allChars = builderState.correctSentence.split('');
             const remaining = [];
-            const targetCopy = [...currentTarget];
+            const targetCopy = [...builderState.targetChars];
             for (let i = 0; i < allChars.length; i++) {
                 const ch = allChars[i];
-                // 檢查是否已經在目標區
                 let found = false;
                 for (let j = 0; j < targetCopy.length; j++) {
                     if (targetCopy[j] === ch) {
@@ -1586,17 +1665,13 @@
                     remaining.push(ch);
                 }
             }
-            // 如果還有剩餘文字沒有被放置，打亂它們
             if (remaining.length > 0) {
                 builderState.sourceChars = shuffleArray(remaining);
             } else {
                 builderState.sourceChars = [];
             }
-            // 重置目標區為空（只保留已放置的文字）
             const newTarget = allChars.map((ch, idx) => {
-                // 檢查是否已經在目標區
-                const placed = builderState.targetChars[idx];
-                return placed !== null ? placed : null;
+                return builderState.targetChars[idx] !== null ? builderState.targetChars[idx] : null;
             });
             builderState.targetChars = newTarget;
             builderState.isAnswered = false;
@@ -1610,7 +1685,6 @@
         function speakHint() {
             const sentence = builderState.correctSentence;
             if (!sentence) return;
-            // 使用粵語朗讀
             ensureCantoneseEngine(() => {
                 speakCantoneseOnce(sentence, () => {});
             });
@@ -1635,11 +1709,10 @@
             }
         }
 
-        // ===== 拖曳邏輯（參考 UI.js 的實現） =====
+        // ===== 拖曳邏輯 =====
         let dragData = null;
 
         function bindDragEvents() {
-            // 清理舊監聽器
             if (window._builderDragCleanup) {
                 window._builderDragCleanup();
             }
@@ -1649,7 +1722,6 @@
 
             if (!sourceDropzone && !targetDropzone) return;
 
-            // 使用事件代理
             document.querySelectorAll('.source-dropzone, .target-dropzone').forEach(zone => {
                 zone.addEventListener('mousedown', onDragStart);
                 zone.addEventListener('touchstart', onDragStart, { passive: true });
@@ -1802,14 +1874,11 @@
                     targetWord = targetChars[targetIndex];
                 }
 
-                // 執行交換或放置
                 if (sourceType === 'source' && targetType === 'source') {
-                    // 來源區內交換
                     const temp = sourceChars[sourceIndex];
                     sourceChars[sourceIndex] = sourceChars[targetIndex];
                     sourceChars[targetIndex] = temp;
                 } else if (sourceType === 'target' && targetType === 'target') {
-                    // 目標區內交換
                     if (targetChars[targetIndex] !== null) {
                         const temp2 = targetChars[sourceIndex];
                         targetChars[sourceIndex] = targetChars[targetIndex];
@@ -1819,7 +1888,6 @@
                         targetChars[sourceIndex] = null;
                     }
                 } else if (sourceType === 'source' && targetType === 'target') {
-                    // 從來源放到目標
                     if (targetChars[targetIndex] === null) {
                         targetChars[targetIndex] = sourceChars[sourceIndex];
                         sourceChars.splice(sourceIndex, 1);
@@ -1829,7 +1897,6 @@
                         targetChars[targetIndex] = temp3;
                     }
                 } else if (sourceType === 'target' && targetType === 'source') {
-                    // 從目標放回來源
                     if (sourceChars[targetIndex] === undefined) {
                         dragData = null;
                         renderBuilder();
@@ -1839,7 +1906,6 @@
                     targetChars[sourceIndex] = sourceChars[targetIndex];
                     sourceChars[targetIndex] = temp4;
                 }
-                // 重置已作答狀態
                 builderState.isAnswered = false;
                 document.getElementById('feedbackMsg').textContent = '💡 將下方單字拖曳到上方答案區';
                 document.getElementById('feedbackMsg').className = 'builder-feedback';
@@ -1849,7 +1915,7 @@
             renderBuilder();
         }
 
-        // ===== 選擇題模式 (保持不變) =====
+        // ===== 選擇題模式 =====
         let currentQuizData = null;
         let currentQuizMode = 'list';
 
@@ -2663,14 +2729,12 @@
                 builderState.isOpen = !builderState.isOpen;
                 if (builderState.isOpen) {
                     content.classList.add('open');
-                    // 如果文章被隱藏，不顯示內容
                     if (isArticleHidden) {
                         content.classList.remove('open');
                         alert("文章已隱藏，請先顯示文章");
                         builderState.isOpen = false;
                         return;
                     }
-                    // 如果沒有句子，嘗試初始化
                     if (builderState.sentences.length === 0 && articles.length > 0) {
                         const art = articles[currentArticleIndex];
                         if (art && art.content) {
@@ -2680,6 +2744,7 @@
                                 builderState.totalCount = sentences.length;
                                 builderState.currentIndex = 0;
                                 builderState.stats = { total: 0, correct: 0 };
+                                builderState.isHintVisible = true;
                                 loadBuilderSentence(0);
                                 updateBuilderStats();
                             } else {
@@ -2698,6 +2763,9 @@
             document.getElementById("checkBtn").onclick = checkAnswer;
             document.getElementById("nextBtn").onclick = nextSentence;
             document.getElementById("listenHintBtn").onclick = speakHint;
+
+            // 新增：提示顯示/隱藏按鈕
+            document.getElementById("toggleHintBtn").onclick = toggleHintVisibility;
         }
 
         function bindTabSwitching() {
@@ -2725,7 +2793,6 @@
                                 } else {
                                     explanationBox.style.display = 'none';
                                 }
-                                // 初始化練習
                                 const sentences = extractSentences(art.content);
                                 if (sentences.length > 0) {
                                     document.getElementById("builderContainer").style.display = 'block';
@@ -2733,6 +2800,7 @@
                                     builderState.totalCount = sentences.length;
                                     builderState.currentIndex = 0;
                                     builderState.stats = { total: 0, correct: 0 };
+                                    builderState.isHintVisible = true;
                                     loadBuilderSentence(0);
                                     updateBuilderStats();
                                 } else {
