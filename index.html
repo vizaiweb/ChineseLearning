@@ -527,6 +527,9 @@
         .builder-actions .btn-next {
             background: #8b5cf6;
         }
+        .builder-actions .btn-prev {
+            background: #6b7280;
+        }
         .builder-feedback {
             text-align: center;
             margin-top: 12px;
@@ -822,6 +825,7 @@
                             <div class="builder-dropzone target-dropzone" id="targetDropzone"></div>
                         </div>
                         <div class="builder-actions">
+                            <button class="btn-prev" id="prevBtn">⬅️ 上一句</button>
                             <button class="btn-shuffle" id="shuffleBtn">🔀 重排</button>
                             <button class="btn-check" id="checkBtn">✅ 檢查答案</button>
                             <button class="btn-next" id="nextBtn">➡️ 下一句</button>
@@ -1476,48 +1480,60 @@ function updateFileSelect(grade) {
             updateHintVisibility();
         }
 
-        function renderBuilder() {
-            const sourceDropzone = document.getElementById('sourceDropzone');
-            const targetDropzone = document.getElementById('targetDropzone');
+// 1. 更新按鈕啟用/停用狀態
+function updateNavButtons() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (prevBtn) {
+        prevBtn.disabled = (builderState.currentIndex <= 0);
+    }
+    if (nextBtn) {
+        nextBtn.disabled = (builderState.currentIndex >= builderState.totalCount - 1);
+    }
+}
+        
+        
+        // 2. Render 函數中調用按鈕更新
+function renderBuilder() {
+    const sourceDropzone = document.getElementById('sourceDropzone');
+    const targetDropzone = document.getElementById('targetDropzone');
+    let sourceHtml = '';
+    
+    if (builderState.sourceChars.length === 0) {
+        sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(所有文字已放置)</span>';
+    } else {
+        sourceHtml = builderState.sourceChars.map((char, idx) => {
+            return `<span class="char-token source-token" data-source-index="${idx}">${escapeHtml(char)}</span>`;
+        }).join('');
+    }
+    sourceDropzone.innerHTML = sourceHtml;
 
-            let sourceHtml = '';
-            if (builderState.sourceChars.length === 0) {
-                sourceHtml = '<span style="color:#94a3b8; font-size:14px;">(所有文字已放置)</span>';
-            } else {
-                sourceHtml = builderState.sourceChars.map((char, idx) => {
-                    return `<span class="char-token source-token" data-source-index="${idx}">${escapeHtml(char)}</span>`;
-                }).join('');
-            }
-            sourceDropzone.innerHTML = sourceHtml;
-
-            let targetHtml = builderState.targetChars.map((char, idx) => {
-                if (char !== null) {
-                    return `<span class="char-token target-token" data-target-index="${idx}">${escapeHtml(char)}</span>`;
-                } else {
-                    return `<span class="char-token target-token empty-slot" data-target-index="${idx}">?</span>`;
-                }
-            }).join('');
-            targetDropzone.innerHTML = targetHtml;
-
-            const nextBtn = document.getElementById('nextBtn');
-            if (nextBtn) {
-                nextBtn.disabled = (builderState.currentIndex >= builderState.totalCount - 1);
-            }
-            updateHintVisibility();
-            bindDragEvents();
-
-            if (builderState.isAnswered) {
-                const isCorrect = checkAnswerInternal();
-                const feedback = document.getElementById('feedbackMsg');
-                if (isCorrect) {
-                    feedback.textContent = '✅ 完全正確！';
-                    feedback.className = 'builder-feedback correct';
-                } else {
-                    feedback.textContent = '❌ 再試一次！';
-                    feedback.className = 'builder-feedback wrong';
-                }
-            }
+    let targetHtml = builderState.targetChars.map((char, idx) => {
+        if (char !== null) {
+            return `<span class="char-token target-token" data-target-index="${idx}">${escapeHtml(char)}</span>`;
+        } else {
+            return `<span class="char-token target-token empty-slot" data-target-index="${idx}">?</span>`;
         }
+    }).join('');
+    targetDropzone.innerHTML = targetHtml;
+
+    // [修改] 更新導覽按鈕狀態（上一句 / 下一句）
+    updateNavButtons();
+    updateHintVisibility();
+    bindDragEvents();
+
+    if (builderState.isAnswered) {
+        const isCorrect = checkAnswerInternal();
+        const feedback = document.getElementById('feedbackMsg');
+        if (isCorrect) {
+            feedback.textContent = '完全正確!';
+            feedback.className = 'builder-feedback correct';
+        } else {
+            feedback.textContent = '再試一次!';
+            feedback.className = 'builder-feedback wrong';
+        }
+    }
+}
 
         function checkAnswerInternal() {
             const correct = builderState.correctSentence.split('');
@@ -1538,34 +1554,58 @@ function updateFileSelect(grade) {
                 `📌 第 <span class="stat-number">${current}</span> / <span class="stat-number">${builderState.totalCount}</span> 句 &nbsp;| ✅ 答對率: <span class="stat-number">${total > 0 ? rate + '%' : '--%'}</span>`;
         }
 
-        function checkAnswer() {
-            if (builderState.isAnswered) return;
-            const isCorrect = checkAnswerInternal();
-            builderState.isAnswered = true;
-            builderState.stats.total++;
-            if (isCorrect) {
-                builderState.stats.correct++;
-                document.getElementById('feedbackMsg').textContent = '✅ 完全正確！';
-                document.getElementById('feedbackMsg').className = 'builder-feedback correct';
-                playBeep(880, 0.2);
-                setTimeout(() => { playBeep(1100, 0.15); }, 150);
-            } else {
-                document.getElementById('feedbackMsg').textContent = '❌ 再試一次！';
-                document.getElementById('feedbackMsg').className = 'builder-feedback wrong';
-                playBeep(440, 0.4);
-            }
-            updateBuilderStats();
-            renderBuilder();
-        }
+        // 3. 檢查答案邏輯（保留點擊檢查）
+function checkAnswer() {
+    if (builderState.isAnswered) return;
+    const isCorrect = checkAnswerInternal();
+    builderState.isAnswered = true;
+    builderState.stats.total++;
+    
+    if (isCorrect) {
+        builderState.stats.correct++;
+        document.getElementById('feedbackMsg').textContent = '完全正確!';
+        document.getElementById('feedbackMsg').className = 'builder-feedback correct';
+        playBeep(880, 0.2);
+        setTimeout(() => { playBeep(1100, 0.15); }, 150);
+    } else {
+        document.getElementById('feedbackMsg').textContent = '再試一次!';
+        document.getElementById('feedbackMsg').className = 'builder-feedback wrong';
+        playBeep(440, 0.4);
+    }
+    updateBuilderStats();
+    renderBuilder();
+}
 
-        function nextSentence() {
-            if (builderState.currentIndex < builderState.totalCount - 1) {
-                builderState.currentIndex++;
-                loadBuilderSentence(builderState.currentIndex);
-                renderBuilder();
-                updateBuilderStats();
-            }
-        }
+        // 4. [修改] 下一句邏輯：自動結算未檢查的答案
+function nextSentence() {
+    // 如果使用者還沒按「檢查答案」就切換，自動觸發檢查計分
+    if (!builderState.isAnswered) {
+        checkAnswer();
+    }
+    
+    if (builderState.currentIndex < builderState.totalCount - 1) {
+        builderState.currentIndex++;
+        loadBuilderSentence(builderState.currentIndex);
+        renderBuilder();
+        updateBuilderStats();
+    }
+}
+
+        // 5. [新增] 上一句邏輯：自動結算並返回前一題
+function prevSentence() {
+    // 切換前若未檢查，自動檢查計分
+    if (!builderState.isAnswered) {
+        checkAnswer();
+    }
+    
+    if (builderState.currentIndex > 0) {
+        builderState.currentIndex--;
+        loadBuilderSentence(builderState.currentIndex);
+        renderBuilder();
+        updateBuilderStats();
+    }
+}
+        
 
         function shuffleChars() {
             if (builderState.isAnswered) {
@@ -2190,52 +2230,57 @@ function updateFileSelect(grade) {
             document.getElementById("showAllWordsBtn").onclick = showAllWordsPopup;
         }
 
-        function bindArticleEvents() {
-            document.getElementById("readArticleBtn").onclick = () => readArticleOnce();
-            document.getElementById("toggleArticleBtn").onclick = () => toggleArticleVisibility();
-            document.getElementById("readExplanationBtn").onclick = () => readExplanationOnce();
-
-            document.getElementById("toggleBuilderBtn").onclick = function() {
-                const content = document.getElementById("builderContent");
-                builderState.isOpen = !builderState.isOpen;
-                if (builderState.isOpen) {
-                    content.classList.add('open');
-                    if (isArticleHidden) {
-                        content.classList.remove('open');
-                        alert("文章已隱藏，請先顯示文章");
+        // 6. [修改] 事件綁定：加入 prevBtn 綁定
+function bindArticleEvents() {
+    document.getElementById("readArticleBtn").onclick = () => readArticleOnce();
+    document.getElementById("toggleArticleBtn").onclick = () => toggleArticleVisibility();
+    document.getElementById("readExplanationBtn").onclick = () => readExplanationOnce();
+    
+    document.getElementById("toggleBuilderBtn").onclick = function() {
+        const content = document.getElementById("builderContent");
+        builderState.isOpen = !builderState.isOpen;
+        if (builderState.isOpen) {
+            content.classList.add('open');
+            if (isArticleHidden) {
+                content.classList.remove('open');
+                alert("文章已隱藏，請先顯示文章");
+                builderState.isOpen = false;
+                return;
+            }
+            if (builderState.sentences.length === 0 && articles.length > 0) {
+                const art = articles[currentArticleIndex];
+                if (art && art.content) {
+                    const sentences = extractSentences(art.content);
+                    if (sentences.length > 0) {
+                        builderState.sentences = sentences;
+                        builderState.totalCount = sentences.length;
+                        builderState.currentIndex = 0;
+                        builderState.stats = { total: 0, correct: 0 };
+                        builderState.isHintVisible = true;
+                        loadBuilderSentence(0);
+                        updateBuilderStats();
+                    } else {
+                        alert("目前文章沒有可練習的句子");
                         builderState.isOpen = false;
                         return;
                     }
-                    if (builderState.sentences.length === 0 && articles.length > 0) {
-                        const art = articles[currentArticleIndex];
-                        if (art && art.content) {
-                            const sentences = extractSentences(art.content);
-                            if (sentences.length > 0) {
-                                builderState.sentences = sentences;
-                                builderState.totalCount = sentences.length;
-                                builderState.currentIndex = 0;
-                                builderState.stats = { total: 0, correct: 0 };
-                                builderState.isHintVisible = true;
-                                loadBuilderSentence(0);
-                                updateBuilderStats();
-                            } else {
-                                alert("目前文章沒有可練習的句子");
-                                builderState.isOpen = false;
-                                return;
-                            }
-                        }
-                    }
-                } else {
-                    content.classList.remove('open');
                 }
-            };
-
-            document.getElementById("shuffleBtn").onclick = shuffleChars;
-            document.getElementById("checkBtn").onclick = checkAnswer;
-            document.getElementById("nextBtn").onclick = nextSentence;
-            document.getElementById("listenHintBtn").onclick = speakHint;
-            document.getElementById("toggleHintBtn").onclick = toggleHintVisibility;
+            }
+        } else {
+            content.classList.remove('open');
         }
+    };
+
+    document.getElementById("shuffleBtn").onclick = shuffleChars;
+    document.getElementById("checkBtn").onclick = checkAnswer;
+    document.getElementById("nextBtn").onclick = nextSentence;
+    // [新增] 綁定上一句按鈕
+    const prevBtn = document.getElementById("prevBtn");
+    if (prevBtn) prevBtn.onclick = prevSentence;
+    
+    document.getElementById("listenHintBtn").onclick = speakHint;
+    document.getElementById("toggleHintBtn").onclick = toggleHintVisibility;
+}
 
         function bindTabSwitching() {
             document.querySelectorAll(".tab-btn").forEach(btn => {
