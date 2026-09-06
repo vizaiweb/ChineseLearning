@@ -1194,15 +1194,19 @@ function updateFileSelect(grade) {
         }
 
         function switchWordSet(set) {
-            currentWordSet = set;
-            refreshWordList(set);
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            if (set === 'must') document.querySelector('[data-tab="must"]').classList.add('active');
-            else if (set === 'only') document.querySelector('[data-tab="only"]').classList.add('active');
-            document.getElementById("wordPanel").style.display = "block";
-            document.getElementById("articlePanel").style.display = "none";
-            stopAllSpeech();
-        }
+    currentWordSet = set;
+    refreshWordList(set);
+    
+    // 【新增/修復】顯示生字面板，隱藏文章面板
+    document.getElementById("wordPanel").style.display = "block";
+    document.getElementById("articlePanel").style.display = "none";
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    if (set === 'must') document.querySelector('[data-tab="must"]').classList.add('active');
+    else if (set === 'only') document.querySelector('[data-tab="only"]').classList.add('active');
+    
+    stopAllSpeech();
+}
 
         function showArticle(index) {
             if (!articles.length) return;
