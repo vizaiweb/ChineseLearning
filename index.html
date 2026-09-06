@@ -913,56 +913,73 @@
         }
 
         function speakCantoneseOnce(text, onEnd) {
-            if (!text || !text.trim()) {
-                if (onEnd) onEnd();
-                return;
+    if (!text || !text.trim()) {
+        if (onEnd) onEnd();
+        return;
+    }
+
+    try { synth.cancel(); } catch (e) {}
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "yue";
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1;
+
+    const voice = getCantoneseVoice();
+    if (voice) {
+        utterance.voice = voice;
+        cantoneseVoice = voice;
+    }
+
+    let ended = false;
+    let isCancelled = false;
+    let timerId = null;
+
+    utterance.onend = () => {
+        if (!ended) {
+            ended = true;
+            if (timerId) clearTimeout(timerId);
+            if (!isCancelled && onEnd) {
+                onEnd();
             }
-
-            try { synth.cancel(); } catch (e) {}
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "yue";
-            utterance.rate = 0.85;
-            utterance.pitch = 1.0;
-            utterance.volume = 1;
-
-            const voice = getCantoneseVoice();
-            if (voice) {
-                utterance.voice = voice;
-                cantoneseVoice = voice;
-            }
-
-            let ended = false;
-            let isCancelled = false;
-
-            utterance.onend = () => {
-                if (!ended) {
-                    ended = true;
-                    if (!isCancelled && onEnd) {
-                        onEnd();
-                    }
-                }
-            };
-
-            utterance.onerror = () => {
-                if (!ended) {
-                    ended = true;
-                    if (!isCancelled && onEnd) {
-                        onEnd();
-                    }
-                }
-            };
-
-            try {
-                synth.speak(utterance);
-            } catch (e) {
-                if (!isCancelled && onEnd) onEnd();
-            }
-
-            return function cancel() {
-                isCancelled = true;
-            };
         }
+    };
+
+    utterance.onerror = () => {
+        if (!ended) {
+            ended = true;
+            if (timerId) clearTimeout(timerId);
+            if (!isCancelled && onEnd) {
+                onEnd();
+            }
+        }
+    };
+
+    try {
+        synth.speak(utterance);
+        // 【新增】安全計時器：如果 onend 沒有在預期時間內觸發，強制結束
+        const estimatedTime = Math.max(5000, text.length * 150);
+        timerId = setTimeout(() => {
+            if (!ended) {
+                ended = true;
+                console.warn('⚠️ 朗讀超時，強制結束:', text.substring(0, 30) + '...');
+                if (!isCancelled && onEnd) {
+                    onEnd();
+                }
+            }
+        }, estimatedTime);
+    } catch (e) {
+        if (timerId) clearTimeout(timerId);
+        if (!isCancelled && onEnd) onEnd();
+    }
+
+    return function cancel() {
+        isCancelled = true;
+        if (timerId) clearTimeout(timerId);
+        try { synth.cancel(); } catch(e) {}
+    };
+}
 
         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
             const parts = [
