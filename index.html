@@ -996,25 +996,52 @@
 }
 
         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
-            const parts = [
-                `題號${index + 1}。${explanation}`,
-                `選項A：${optA}`,
-                `選項B：${optB}`,
-                `選項C：${optC}`
-            ];
-            let currentIndex = 0;
-            function speakNext() {
-                if (currentIndex >= parts.length) {
-                    if (onEnd) onEnd();
-                    return;
-                }
-                speakCantoneseOnce(parts[currentIndex], () => {
-                    currentIndex++;
-                    speakNext();
-                });
-            }
-            speakNext();
+    // 1. 清理字串，並依標點符號將長解釋拆分為短句
+    let cleanExp = (explanation || '').replace(/[\n\r\s]+/g, ' ');
+    let rawChunks = cleanExp.split(/([,。!?;: \n]+)/).filter(s => s.trim().length > 0);
+    
+    let expChunks = [];
+    for (let i = 0; i < rawChunks.length; i += 2) {
+        let part = rawChunks[i] + (rawChunks[i + 1] || '');
+        if (part.trim()) expChunks.push(part);
+    }
+    
+    // 如果解釋本身很短，直接作為單一片段
+    if (expChunks.length === 0 && cleanExp.trim()) {
+        expChunks = [cleanExp];
+    }
+
+    // 2. 組合完整的朗讀清單（包含題號、分段解釋、選項 A/B/C）
+    const parts = [
+        `題號${index + 1}`,
+        ...expChunks,
+        `選項 A:${optA || ''}`,
+        `選項 B:${optB || ''}`,
+        `選項 C:${optC || ''}`
+    ];
+
+    let currentIndex = 0;
+
+    // 3. 遞迴逐句朗讀，確保每句讀完才讀下一句
+    function speakNext() {
+        // 如果手動停止或已讀完全部片段，結束朗讀
+        if (!isCantoneseReading || currentIndex >= parts.length) {
+            if (onEnd) onEnd();
+            return;
         }
+
+        const currentText = parts[currentIndex];
+        currentIndex++;
+
+        // 調用單句朗讀
+        currentCancelFunction = speakCantoneseOnce(currentText, () => {
+            // 每句之間給予 150ms 緩衝，避免語音引擎連續調用導致卡死
+            setTimeout(speakNext, 150);
+        });
+    }
+
+    speakNext();
+}
 
         function stopAllSpeech() {
             if (currentCancelFunction) {
