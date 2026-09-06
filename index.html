@@ -1336,7 +1336,7 @@
   function speakNextChunk() {
     if (!isCantoneseReading || chunkIndex >= chunks.length) {
       // 讀完所有片段後重置按鈕
-      button.textContent = "朗讀解釋";
+      button.textContent = "🔊 朗讀解釋";
       button.classList.remove('reading-disabled');
       isCantoneseReading = false;
       currentCantoneseButton = null;
