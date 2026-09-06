@@ -75,23 +75,23 @@
             flex-wrap: wrap;
         }
         .tab-btn {
-            background: #cfb284;
-            flex: 1;
-            text-align: center;
-            border: none;
-            border-radius: 40px;
-            padding: 10px 0;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-            font-family: inherit;
-            transition: 0.2s;
-        }
-        .tab-btn.active {
-            background: #ff7a3c;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
+    background: #222222;          /* 黑底 */
+    flex: 1;
+    text-align: center;
+    border: none;
+    border-radius: 0px;            /* 方形，無圓角 */
+    padding: 12px 0;              /* 稍微增加高度 */
+    color: white;                 /* 白字 */
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 15px;
+    font-family: inherit;
+    transition: 0.2s;
+}
+.tab-btn.active {
+    background: #333333;          /* 作用中按鈕稍微亮一點，仍是黑色系 */
+    box-shadow: inset 0 -3px 0 #ffaa66;  /* 底部加入橙色線條，提示目前所在分頁 */
+}
         .tab-btn:active {
             transform: scale(0.96);
         }
@@ -1133,9 +1133,10 @@
                 wordDiv.innerHTML = `<span style="font-size:50px;">${w.character}</span>`;
                 document.getElementById("toggleWordBtn").textContent = "🙈 隱藏生字";
             } else {
-                wordDiv.innerHTML = ``;
-                document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
-            }
+    // 生字隱藏時顯示淺灰色斜體提示
+    wordDiv.innerHTML = `<span style="color: #b0a090; font-style: italic; font-size: 28px; font-weight: normal;">我被隱藏了</span>`;
+    document.getElementById("toggleWordBtn").textContent = "👁️ 顯示生字";
+}
             const total = currentFilteredWords.length;
             document.getElementById("wordProgress").innerHTML =
                 `📌 第 ${currentWordIndex+1} / ${total} 字 &nbsp;| 課次: ${w.day || "—"}`;
@@ -2218,24 +2219,25 @@
         }
 
         function bindFileSelect() {
-            document.getElementById("fileSelect").addEventListener("change", async (e) => {
-                const filename = e.target.value;
-                if (!filename) return;
-                await loadExcelFile(filename);
-                isWordVisible = false;
-                if (currentWordSet !== "article") {
-                    document.getElementById("wordPanel").style.display = "block";
-                    document.getElementById("articlePanel").style.display = "none";
-                    refreshWordList(currentWordSet);
-                } else {
-                    document.getElementById("wordPanel").style.display = "none";
-                    document.getElementById("articlePanel").style.display = "block";
-                    if (articles.length) {
-                        showArticle(currentArticleIndex);
-                    }
-                }
-            });
-        }
+    document.getElementById("fileSelect").addEventListener("change", async (e) => {
+        const filename = e.target.value;
+        if (!filename) return;
+        await loadExcelFile(filename);
+        isWordVisible = false;
+        
+        // 【新增】強制切換到「必懂寫生字」分頁
+        currentWordSet = "must";
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('[data-tab="must"]').classList.add('active');
+        
+        // 顯示生字面板，隱藏文章面板
+        document.getElementById("wordPanel").style.display = "block";
+        document.getElementById("articlePanel").style.display = "none";
+        
+        // 刷新生字列表（必懂寫）
+        refreshWordList("must");
+    });
+}
 
         // ===== 輔助函數 =====
         function escapeHtml(str) {
