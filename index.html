@@ -842,6 +842,10 @@
 
     <script>
         // ---------- 全域變數 ----------
+
+        let currentUtterance = null; // 全域引用，防止 GC 回收導致中斷
+let keepAliveTimer = null;   // 心跳計時器
+        
         let allMustWords = [];
         let allOnlyWords = [];
         let articles = [];
@@ -927,72 +931,83 @@
         }
 
         function speakCantoneseOnce(text, onEnd) {
-    if (!text || !text.trim()) {
-        if (onEnd) onEnd();
-        return;
+  if (!text || !text.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+  
+  // 清理舊的心跳計時器
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
+
+  try { synth.cancel(); } catch (e) {}
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  
+  // 關鍵 1：將 utterance 掛載到全域變數，防止瀏覽器在朗讀中途將其垃圾回收 (GC)
+  window.currentUtterance = utterance;
+
+  utterance.lang = "yue";
+  utterance.rate = 0.85;
+  utterance.pitch = 1.0;
+  utterance.volume = 1;
+
+  const voice = getCantoneseVoice();
+  if (voice) {
+    utterance.voice = voice;
+    cantoneseVoice = voice;
+  }
+
+  let ended = false;
+  let isCancelled = false;
+
+  const cleanup = () => {
+    if (keepAliveTimer) {
+      clearInterval(keepAliveTimer);
+      keepAliveTimer = null;
     }
+    window.currentUtterance = null; // 釋放引用
+  };
 
-    try { synth.cancel(); } catch (e) {}
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "yue";
-    utterance.rate = 0.85;
-    utterance.pitch = 1.0;
-    utterance.volume = 1;
-
-    const voice = getCantoneseVoice();
-    if (voice) {
-        utterance.voice = voice;
-        cantoneseVoice = voice;
+  utterance.onend = () => {
+    if (!ended) {
+      ended = true;
+      cleanup();
+      if (!isCancelled && onEnd) onEnd();
     }
+  };
 
-    let ended = false;
-    let isCancelled = false;
-    let timerId = null;
-
-    utterance.onend = () => {
-        if (!ended) {
-            ended = true;
-            if (timerId) clearTimeout(timerId);
-            if (!isCancelled && onEnd) {
-                onEnd();
-            }
-        }
-    };
-
-    utterance.onerror = () => {
-        if (!ended) {
-            ended = true;
-            if (timerId) clearTimeout(timerId);
-            if (!isCancelled && onEnd) {
-                onEnd();
-            }
-        }
-    };
-
-    try {
-        synth.speak(utterance);
-        // 【新增】安全計時器：如果 onend 沒有在預期時間內觸發，強制結束
-        const estimatedTime = Math.max(5000, text.length * 150);
-        timerId = setTimeout(() => {
-            if (!ended) {
-                ended = true;
-                console.warn('⚠️ 朗讀超時，強制結束:', text.substring(0, 30) + '...');
-                if (!isCancelled && onEnd) {
-                    onEnd();
-                }
-            }
-        }, estimatedTime);
-    } catch (e) {
-        if (timerId) clearTimeout(timerId);
-        if (!isCancelled && onEnd) onEnd();
+  utterance.onerror = (e) => {
+    if (!ended) {
+      ended = true;
+      cleanup();
+      if (!isCancelled && onEnd) onEnd();
     }
+  };
 
-    return function cancel() {
-        isCancelled = true;
-        if (timerId) clearTimeout(timerId);
-        try { synth.cancel(); } catch(e) {}
-    };
+  try {
+    synth.speak(utterance);
+
+    // 關鍵 2：每 10 秒觸發一次 pause/resume，防止 Chrome/Safari TTS 引擎暫停掛起
+    keepAliveTimer = setInterval(() => {
+      if (synth.speaking && !synth.paused) {
+        synth.pause();
+        synth.resume();
+      }
+    }, 10000);
+
+  } catch (e) {
+    cleanup();
+    if (!isCancelled && onEnd) onEnd();
+  }
+
+  return function cancel() {
+    isCancelled = true;
+    cleanup();
+    try { synth.cancel(); } catch(e) {}
+  };
 }
 
         function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
