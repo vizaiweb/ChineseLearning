@@ -2204,15 +2204,29 @@ function prevSentence() {
                     .btn-close { background: #b0a090; }
                     .quiz-select { padding: 4px; border-radius: 10px; border: 1px solid #ffcd94; }
                     .quiz-stats { margin-bottom: 10px; font-weight: bold; color: #b45f2b; display: flex; gap: 15px; }
-                    .quiz-speak-btn { background: none; border: none; font-size: 18px; cursor: pointer; }
+                    .quiz-speak-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 30px; }
+                    .quiz-speak-btn:hover { background: #f0e8d8; }
+                    .col-option { padding: 8px; cursor: pointer; border-radius: 6px; transition: 0.2s; text-align: center; }
+                    .col-option:hover { background: #e2e8f0; }
+                    .option-correct { background: #dcfce7 !important; color: #15803d; }
+                    .option-wrong { background: #fee2e2 !important; color: #dc2626; }
+                    .option-disabled { cursor: default; opacity: 0.7; }
+                    .option-disabled:hover { background: transparent; }
+                    .not-answered { color: #94a3b8; font-size: 12px; }
+                    .result-correct { color: #22c55e; font-size: 20px; }
+                    .result-wrong { color: #ef4444; font-size: 20px; }
+                    .current-marker { color: #ff6b35; margin-right: 4px; }
+                    .current-row { background: #fff3cd !important; }
+                    .current-row:hover { background: #ffedb3 !important; }
+                    .col-no { font-weight: 600; color: #64748b; }
                 </style>
             </head>
             <body>
                 <div class="header-box">
                     <h2 id="quizTitle">${setTitle}</h2>
                     <div>
-                        <button class="btn" id="modeToggleBtn">選擇題練習</button>
-                        <button class="btn btn-close" onclick="window.close()">關閉</button>
+                        <button class="btn" id="modeToggleBtn">📝 選擇題練習</button>
+                        <button class="btn btn-close" onclick="window.close()">❌ 關閉</button>
                     </div>
                 </div>
 
@@ -2223,41 +2237,399 @@ function prevSentence() {
                 <div id="quizContainer" style="display:none;"></div>
 
                 <script>
-                    // 將主視窗的資料與邏輯同步注入彈窗
-                    let currentQuizData = ${JSON.stringify(currentQuizData)};
+                    // ===== 複製必要的資料與函數到彈窗 =====
+                    let quizData = ${JSON.stringify(currentQuizData)};
                     let currentWordSet = "${currentWordSet}";
-                    
-                    ${generateQuizData.toString()}
-                    ${renderQuizTable.toString()}
-                    ${toggleSingleQuizReading.toString()}
-                    ${speakSingleQuizItem.toString()}
-                    ${speakCantoneseOnce.toString()}
-                    ${getCantoneseVoice.toString()}
-                    ${ensureCantoneseEngine.toString()}
-                    ${escapeHtml.toString()}
-                    
+                    let currentQuestionIdx = 0;
+                    let isCantoneseReading = false;
+                    let quizItemReadingIndex = null;
+                    let currentCancelFunction = null;
+
+                    // ===== 語音引擎函數 (從主視窗複製) =====
                     let synth = window.speechSynthesis;
                     let cantoneseVoice = null;
                     let cantoneseVoiceEngineReady = false;
-                    let isCantoneseReading = false;
-                    let quizItemReadingIndex = null;
 
-                    document.getElementById('modeToggleBtn').onclick = function() {
+                    function getCantoneseVoice() {
+                        const voices = synth.getVoices();
+                        if (!voices || voices.length === 0) return null;
+                        return voices.find(v => v.name && v.name === 'Sin-Ji') ||
+                            voices.find(v => v.name && v.name.includes('Google') && (v.lang === 'yue' || v.lang === 'zh-HK')) ||
+                            voices.find(v => v.name && v.name.includes('Cantonese')) ||
+                            voices.find(v => v.lang === 'yue') ||
+                            voices.find(v => v.lang === 'zh-HK') ||
+                            voices.find(v => v.lang && v.lang.includes('hk')) ||
+                            null;
+                    }
+
+                    function ensureCantoneseEngine(callback) {
+                        if (cantoneseVoiceEngineReady && cantoneseVoice) {
+                            if (callback) callback();
+                            return true;
+                        }
+                        try {
+                            const silent = new SpeechSynthesisUtterance('');
+                            silent.volume = 0;
+                            const voice = getCantoneseVoice();
+                            if (voice) {
+                                cantoneseVoice = voice;
+                                silent.voice = voice;
+                            }
+                            silent.onend = () => {
+                                cantoneseVoiceEngineReady = true;
+                                if (callback) callback();
+                            };
+                            synth.speak(silent);
+                            setTimeout(() => {
+                                if (!cantoneseVoiceEngineReady) {
+                                    cantoneseVoiceEngineReady = true;
+                                    if (callback) callback();
+                                }
+                            }, 500);
+                        } catch (e) {
+                            cantoneseVoiceEngineReady = true;
+                            if (callback) callback();
+                        }
+                        return false;
+                    }
+
+                    function speakCantoneseOnce(text, onEnd) {
+                        if (!text || !text.trim()) {
+                            if (onEnd) onEnd();
+                            return;
+                        }
+                        try { synth.cancel(); } catch (e) {}
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = "yue";
+                        utterance.rate = 0.85;
+                        utterance.pitch = 1.0;
+                        utterance.volume = 1;
+                        const voice = getCantoneseVoice();
+                        if (voice) {
+                            utterance.voice = voice;
+                            cantoneseVoice = voice;
+                        }
+                        let ended = false;
+                        let isCancelled = false;
+                        utterance.onend = () => {
+                            if (!ended) {
+                                ended = true;
+                                if (!isCancelled && onEnd) {
+                                    onEnd();
+                                }
+                            }
+                        };
+                        utterance.onerror = () => {
+                            if (!ended) {
+                                ended = true;
+                                if (!isCancelled && onEnd) {
+                                    onEnd();
+                                }
+                            }
+                        };
+                        try {
+                            synth.speak(utterance);
+                        } catch (e) {
+                            if (!isCancelled && onEnd) onEnd();
+                        }
+                        return function cancel() {
+                            isCancelled = true;
+                        };
+                    }
+
+                    function speakSingleQuizItem(index, explanation, optA, optB, optC, onEnd) {
+                        const parts = [
+                            \`題號\${index + 1}。\${explanation}\`,
+                            \`選項A：\${optA}\`,
+                            \`選項B：\${optB}\`,
+                            \`選項C：\${optC}\`
+                        ];
+                        let currentIndex = 0;
+                        function speakNext() {
+                            if (currentIndex >= parts.length) {
+                                if (onEnd) onEnd();
+                                return;
+                            }
+                            speakCantoneseOnce(parts[currentIndex], () => {
+                                currentIndex++;
+                                speakNext();
+                            });
+                        }
+                        speakNext();
+                    }
+
+                    function toggleSingleQuizReading(index, buttonElement) {
+                        if (!quizData || index >= quizData.length) return;
+                        if (quizItemReadingIndex === index && isCantoneseReading) {
+                            if (currentCancelFunction) {
+                                currentCancelFunction();
+                                currentCancelFunction = null;
+                            }
+                            isCantoneseReading = false;
+                            quizItemReadingIndex = null;
+                            buttonElement.textContent = "🔊";
+                            return;
+                        }
+                        if (isCantoneseReading) {
+                            if (currentCancelFunction) {
+                                currentCancelFunction();
+                                currentCancelFunction = null;
+                            }
+                            isCantoneseReading = false;
+                            quizItemReadingIndex = null;
+                            document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                                btn.textContent = "🔊";
+                            });
+                        }
+                        const item = quizData[index];
+                        const optA = item.options.find(o => o.letter === 'A');
+                        const optB = item.options.find(o => o.letter === 'B');
+                        const optC = item.options.find(o => o.letter === 'C');
+                        buttonElement.textContent = "⏹️";
+                        quizItemReadingIndex = index;
+                        isCantoneseReading = true;
+                        speakSingleQuizItem(
+                            index,
+                            item.explanation,
+                            optA ? optA.text : '',
+                            optB ? optB.text : '',
+                            optC ? optC.text : '',
+                            () => {
+                                buttonElement.textContent = "🔊";
+                                quizItemReadingIndex = null;
+                                isCantoneseReading = false;
+                            }
+                        );
+                    }
+
+                    function escapeHtml(str) {
+                        if (!str) return '';
+                        return str.replace(/[&<>]/g, function(m) {
+                            if (m === '&') return '&amp;';
+                            if (m === '<') return '&lt;';
+                            if (m === '>') return '&gt;';
+                            return m;
+                        });
+                    }
+
+                    function shuffleArray(arr) {
+                        const shuffled = [...arr];
+                        for (let i = shuffled.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                        }
+                        return shuffled;
+                    }
+
+                    // ===== 生成選擇題資料 =====
+                    function generateQuizDataFromWords(words) {
+                        if (!words || words.length === 0) return [];
+                        const items = [];
+                        const allChars = words.map(w => w.character);
+                        for (let i = 0; i < words.length; i++) {
+                            const correct = words[i];
+                            let distractors = [];
+                            const candidates = allChars.filter(ch => ch !== correct.character);
+                            if (candidates.length < 2) {
+                                while (distractors.length < 2) {
+                                    distractors.push(candidates.length > 0 ? candidates[0] : correct.character);
+                                }
+                            } else {
+                                const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+                                distractors = shuffled.slice(0, 2);
+                            }
+                            const options = [
+                                { text: correct.character, isCorrect: true },
+                                { text: distractors[0], isCorrect: false },
+                                { text: distractors[1], isCorrect: false }
+                            ];
+                            const shuffledOptions = options.sort(() => Math.random() - 0.5);
+                            let correctLetter = '';
+                            const letters = ['A', 'B', 'C'];
+                            for (let idx = 0; idx < shuffledOptions.length; idx++) {
+                                if (shuffledOptions[idx].isCorrect) {
+                                    correctLetter = letters[idx];
+                                    break;
+                                }
+                            }
+                            items.push({
+                                index: i,
+                                explanation: correct.explanation || '',
+                                correctChar: correct.character,
+                                correctLetter: correctLetter,
+                                options: shuffledOptions.map((opt, idx) => ({
+                                    letter: letters[idx],
+                                    text: opt.text,
+                                    isCorrect: opt.isCorrect
+                                })),
+                                userAnswer: null,
+                                isAnswered: false
+                            });
+                        }
+                        return items;
+                    }
+
+                    // 如果 quizData 是空的，重新生成
+                    if (!quizData || quizData.length === 0) {
+                        const sourceData = (currentWordSet === "must") ? window.opener.allMustWords : window.opener.allOnlyWords;
+                        if (sourceData && sourceData.length > 0) {
+                            quizData = generateQuizDataFromWords(sourceData);
+                        }
+                    }
+
+                    // ===== 渲染選擇題 =====
+                    function renderQuizTable(quizItems, containerId) {
+                        const container = document.getElementById(containerId);
+                        if (!container) return;
+                        if (!quizItems || quizItems.length === 0) {
+                            container.innerHTML = '<p style="color:#b45f2b; text-align:center; padding:20px;">⚠️ 沒有生字資料，無法生成選擇題。</p>';
+                            return;
+                        }
+
+                        let total = quizItems.length;
+                        let answered = quizItems.filter(item => item.isAnswered).length;
+                        let correctCount = quizItems.filter(item => item.isAnswered && item.userAnswer === item.correctLetter).length;
+                        let accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
+
+                        let html = \`
+                            <div class="quiz-stats">
+                                <span>📊 總題數：\${total}</span>
+                                <span>✅ 已答：\${answered}</span>
+                                <span>🎯 正確率：\${accuracy}%</span>
+                            </div>
+                            <table class="quiz-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:45px;">題號</th>
+                                        <th>解釋</th>
+                                        <th style="width:75px;">選項 A</th>
+                                        <th style="width:75px;">選項 B</th>
+                                        <th style="width:75px;">選項 C</th>
+                                        <th style="width:105px;">你的答案</th>
+                                        <th style="width:80px;">結果</th>
+                                        <th style="width:45px;">朗讀</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        \`;
+                        for (let i = 0; i < quizItems.length; i++) {
+                            const item = quizItems[i];
+                            const options = item.options;
+                            const optionA = options.find(o => o.letter === 'A');
+                            const optionB = options.find(o => o.letter === 'B');
+                            const optionC = options.find(o => o.letter === 'C');
+                            const isCurrent = (i === currentQuestionIdx);
+                            let rowClass = '';
+                            let resultDisplay = '';
+                            if (item.isAnswered) {
+                                const isCorrect = item.userAnswer === item.correctLetter;
+                                if (isCorrect) {
+                                    rowClass = 'correct';
+                                    resultDisplay = '<span class="result-correct">✅</span>';
+                                } else {
+                                    rowClass = 'wrong';
+                                    resultDisplay = '<span class="result-wrong">❌</span>';
+                                }
+                            }
+                            html += \`
+                                <tr class="\${rowClass} \${isCurrent ? 'current-row' : ''}" data-index="\${i}">
+                                    <td class="col-no" style="text-align:center; font-weight:bold;">
+                                        \${isCurrent ? '<span class="current-marker">▶</span>' : ''}
+                                        \${i + 1}
+                                    </td>
+                                    <td>\${escapeHtml(item.explanation)}</td>
+                                    <td class="col-option \${item.isAnswered ? (item.userAnswer === 'A' && item.userAnswer !== item.correctLetter ? 'option-wrong' : '') : ''} \${item.isAnswered && optionA && optionA.isCorrect ? 'option-correct' : ''} \${item.isAnswered ? 'option-disabled' : ''}" data-quiz-index="\${i}" data-option-label="A">\${optionA ? escapeHtml(optionA.text) : ''}</td>
+                                    <td class="col-option \${item.isAnswered ? (item.userAnswer === 'B' && item.userAnswer !== item.correctLetter ? 'option-wrong' : '') : ''} \${item.isAnswered && optionB && optionB.isCorrect ? 'option-correct' : ''} \${item.isAnswered ? 'option-disabled' : ''}" data-quiz-index="\${i}" data-option-label="B">\${optionB ? escapeHtml(optionB.text) : ''}</td>
+                                    <td class="col-option \${item.isAnswered ? (item.userAnswer === 'C' && item.userAnswer !== item.correctLetter ? 'option-wrong' : '') : ''} \${item.isAnswered && optionC && optionC.isCorrect ? 'option-correct' : ''} \${item.isAnswered ? 'option-disabled' : ''}" data-quiz-index="\${i}" data-option-label="C">\${optionC ? escapeHtml(optionC.text) : ''}</td>
+                                    <td style="font-weight:500; color:#1e293b;">\${item.isAnswered ? escapeHtml(item.userAnswer) : '<span class="not-answered">請揀選</span>'}</td>
+                                    <td style="text-align:center;">\${resultDisplay}</td>
+                                    <td style="text-align:center;">
+                                        <button class="quiz-speak-btn" data-quiz-index="\${i}">🔊</button>
+                                    </td>
+                                </tr>
+                            \`;
+                        }
+                        html += \`
+                                </tbody>
+                            </table>
+                        \`;
+                        container.innerHTML = html;
+
+                        // 綁定選項點擊事件
+                        document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
+                            cell.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                const index = parseInt(this.dataset.quizIndex);
+                                const label = this.dataset.optionLabel;
+                                if (!isNaN(index) && label) {
+                                    const q = quizData[index];
+                                    if (q && q.userAnswer === null) {
+                                        q.userAnswer = label;
+                                        q.isAnswered = true;
+                                        renderQuizTable(quizData, 'quizContainer');
+                                    }
+                                }
+                            });
+                        });
+
+                        // 綁定朗讀按鈕事件
+                        document.querySelectorAll('.quiz-speak-btn').forEach(btn => {
+                            btn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                const index = parseInt(this.dataset.quizIndex);
+                                if (!isNaN(index) && quizData[index]) {
+                                    toggleSingleQuizReading(index, this);
+                                }
+                            });
+                        });
+
+                        // 綁定列點擊事件（切換當前題目）
+                        document.querySelectorAll('#quizContainer table tbody tr').forEach(row => {
+                            row.addEventListener('click', function(e) {
+                                if (e.target.closest('.col-option') || e.target.closest('.quiz-speak-btn')) return;
+                                const index = parseInt(this.dataset.index);
+                                if (!isNaN(index) && index !== currentQuestionIdx) {
+                                    currentQuestionIdx = index;
+                                    renderQuizTable(quizData, 'quizContainer');
+                                }
+                            });
+                        });
+                    }
+
+                    // ===== 切換模式 =====
+                    document.getElementById('modeToggleBtn').addEventListener('click', function() {
                         const list = document.getElementById('wordListContainer');
                         const quiz = document.getElementById('quizContainer');
                         if (list.style.display !== 'none') {
                             list.style.display = 'none';
                             quiz.style.display = 'block';
-                            this.textContent = '返回列表';
-                            document.getElementById('quizTitle').textContent = '選擇題練習';
-                            renderQuizTable(currentQuizData, 'quizContainer');
+                            this.textContent = '📋 返回列表';
+                            document.getElementById('quizTitle').textContent = '📝 選擇題練習';
+                            // 如果 quizData 為空，從主視窗獲取資料
+                            if (!quizData || quizData.length === 0) {
+                                const sourceData = (currentWordSet === "must") ? window.opener.allMustWords : window.opener.allOnlyWords;
+                                if (sourceData && sourceData.length > 0) {
+                                    quizData = generateQuizDataFromWords(sourceData);
+                                }
+                            }
+                            renderQuizTable(quizData, 'quizContainer');
                         } else {
                             list.style.display = 'block';
                             quiz.style.display = 'none';
-                            this.textContent = '選擇題練習';
+                            this.textContent = '📝 選擇題練習';
                             document.getElementById('quizTitle').textContent = '${setTitle}';
                         }
-                    };
+                    });
+
+                    // ===== 如果初始有 quizData，預渲染 =====
+                    if (quizData && quizData.length > 0) {
+                        // 預先渲染但隱藏
+                        const quizContainer = document.getElementById('quizContainer');
+                        quizContainer.style.display = 'none';
+                        renderQuizTable(quizData, 'quizContainer');
+                    }
+
+                    console.log('✅ 彈窗選擇題已就緒');
                 <\/script>
             </body>
             </html>
