@@ -1300,43 +1300,64 @@
         }
 
         function readExplanationOnce() {
-            if (!articles.length) return;
-            const art = articles[currentArticleIndex];
-            if (!art.explanation || art.explanation.trim() === '') {
-                alert("此文章沒有解釋內容");
-                return;
-            }
-            const button = document.getElementById("readExplanationBtn");
-            if (isCantoneseReading && currentCantoneseButton === button) {
-                stopAllSpeech();
-                return;
-            }
-            stopAllSpeech();
-            currentCantoneseButton = button;
-            button.textContent = "⏹️ 停止";
-            button.classList.add('reading-disabled');
-            isCantoneseReading = true;
+  if (!articles.length) return;
+  const art = articles[currentArticleIndex];
+  if (!art.explanation || art.explanation.trim() === '') {
+    alert("此文章沒有解釋內容");
+    return;
+  }
+  
+  const button = document.getElementById("readExplanationBtn");
+  if (isCantoneseReading && currentCantoneseButton === button) {
+    stopAllSpeech();
+    return;
+  }
+  
+  stopAllSpeech();
+  currentCantoneseButton = button;
+  button.textContent = "停止";
+  button.classList.add('reading-disabled');
+  isCantoneseReading = true;
 
-            let cleanExplanation = art.explanation
-                .replace(/[\n\r]+/g, '。')
-                .replace(/\s+/g, ' ')
-                .replace(/[。]+/g, '。')
-                .trim();
+  // 1. 清理字串並依標點符號切分成短句陣列
+  let rawExplanation = art.explanation.replace(/[\n\r\s]+/g, '');
+  // 按 逗號、句號、冒號、括號 等符號切分
+  let sentences = rawExplanation.split(/([，。！？；：\n]+)/).filter(s => s.trim().length > 0);
 
-            if (cleanExplanation.length < 5) {
-                cleanExplanation = cleanExplanation + '。';
-            }
+  // 將符號與前面的句子重新組合，保持語氣連貫
+  let chunks = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    let part = sentences[i] + (sentences[i + 1] || '');
+    if (part.trim()) chunks.push(part);
+  }
 
-            ensureCantoneseEngine(() => {
-                currentCancelFunction = speakCantoneseOnce(cleanExplanation, () => {
-                    button.textContent = "🔊 朗讀解釋";
-                    button.classList.remove('reading-disabled');
-                    isCantoneseReading = false;
-                    currentCantoneseButton = null;
-                    currentCancelFunction = null;
-                });
-            });
-        }
+  // 2. 逐句朗讀遞迴函數
+  let chunkIndex = 0;
+  function speakNextChunk() {
+    if (!isCantoneseReading || chunkIndex >= chunks.length) {
+      // 讀完所有片段後重置按鈕
+      button.textContent = "朗讀解釋";
+      button.classList.remove('reading-disabled');
+      isCantoneseReading = false;
+      currentCantoneseButton = null;
+      currentCancelFunction = null;
+      return;
+    }
+
+    const currentText = chunks[chunkIndex];
+    chunkIndex++;
+
+    ensureCantoneseEngine(() => {
+      currentCancelFunction = speakCantoneseOnce(currentText, () => {
+        // 當前短句讀完後，延遲 100ms 繼續讀下一句
+        setTimeout(speakNextChunk, 100);
+      });
+    });
+  }
+
+  // 開始朗讀第一句
+  speakNextChunk();
+}
 
         // ===== 句子重組練習核心函數 =====
         function extractSentences(content) {
