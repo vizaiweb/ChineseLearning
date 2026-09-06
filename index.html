@@ -1063,24 +1063,25 @@ async function loadFileList() {
 }
 
         // 2. 根據選擇的年級更新「課本」選單
+// 2. 根據選擇的年級更新「課本」選單
 function updateFileSelect(grade) {
   const fileSelect = document.getElementById('fileSelect');
   fileSelect.innerHTML = '<option value="">-- 請選擇單元 --</option>';
-  
-  if (!grade || !gradeData[grade]) {
+
+  if (!grade || !gradeData || !gradeData[grade]) {
     fileSelect.disabled = true;
     return;
   }
-  
+
   const files = gradeData[grade];
   files.forEach(f => {
     const option = document.createElement('option');
     option.value = f;
     option.textContent = f.replace(/\.xlsx$/i, "");
-    fileSelect.appendChild(option);
+    fileSelect.appendChild(option); // 移入迴圈內
   });
-  
-  fileSelect.disabled = files.length === 0;
+
+  fileSelect.disabled = (files.length === 0);
 }
         
         async function loadExcelFile(filename) {
