@@ -734,13 +734,23 @@
         </div>
 
         <div class="select-section">
-            <div class="select-row">
-                <label>📁 課本：</label>
-                <select id="fileSelect">
-                    <option value="">-- 請選擇單元 --</option>
-                </select>
-            </div>
-            <!-- 已移除課次篩選列 -->
+            <!-- 年級選擇 -->
+  <div class="select-row">
+    <label>🎓 年級:</label>
+    <select id="gradeSelect">
+      <option value="">-- 請選擇年級 --</option>
+      <option value="P2">二年級</option>
+      <option value="P3">三年級</option>
+    </select>
+  </div>
+
+  <!-- 課本選擇 -->
+  <div class="select-row">
+    <label>📁 課本:</label>
+    <select id="fileSelect" disabled>
+      <option value="">-- 請先選擇年級 --</option>
+    </select>
+  </div>
             <div class="tab-group">
                 <button class="tab-btn active" data-tab="must">📝 必懂寫生字</button>
                 <button class="tab-btn" data-tab="only">👀 只需記認生字</button>
@@ -1034,28 +1044,45 @@
             './';
         const DATA_PATH = `${BASE_URL}data/chinese/`;
 
-        async function loadFileList() {
-            try {
-                const listUrl = `${DATA_PATH}fileList.json`;
-                const res = await fetch(listUrl);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = await res.json();
-                const files = json.files || [];
-                const fileSelect = document.getElementById('fileSelect');
-                fileSelect.innerHTML = '<option value="">-- 請選擇單元 --</option>';
-                files.forEach(f => {
-                    const option = document.createElement('option');
-                    option.value = f;
-                    option.textContent = f.replace(/\.xlsx$/i, '');
-                    fileSelect.appendChild(option);
-                });
-                if (files.length > 0) fileSelect.disabled = false;
-            } catch (e) {
-                console.warn("無法讀取 fileList.json", e);
-                document.getElementById('fileSelect').innerHTML = '<option value="">無法載入清單</option>';
-            }
-        }
+        // 全域變數：儲存 JSON 讀取到的年級資料
+        let gradeData = {};
+        
+        // 1. 讀取 JSON 檔案
+async function loadFileList() {
+  try {
+    const listUrl = `${DATA_PATH}fileList.json`;
+    const res = await fetch(listUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    // 直接將讀取到的 JSON 存入 gradeData
+    gradeData = await res.json();
+  } catch (e) {
+    console.warn("無法讀取 fileList.json", e);
+    document.getElementById('fileSelect').innerHTML = '<option value="">無法載入清單</option>';
+  }
+}
 
+        // 2. 根據選擇的年級更新「課本」選單
+function updateFileSelect(grade) {
+  const fileSelect = document.getElementById('fileSelect');
+  fileSelect.innerHTML = '<option value="">-- 請選擇單元 --</option>';
+  
+  if (!grade || !gradeData[grade]) {
+    fileSelect.disabled = true;
+    return;
+  }
+  
+  const files = gradeData[grade];
+  files.forEach(f => {
+    const option = document.createElement('option');
+    option.value = f;
+    option.textContent = f.replace(/\.xlsx$/i, "");
+    fileSelect.appendChild(option);
+  });
+  
+  fileSelect.disabled = files.length === 0;
+}
+        
         async function loadExcelFile(filename) {
             if (!filename) return false;
             currentFileName = filename;
@@ -2256,25 +2283,30 @@
             });
         }
 
-        function bindFileSelect() {
-    document.getElementById("fileSelect").addEventListener("change", async (e) => {
-        const filename = e.target.value;
-        if (!filename) return;
-        await loadExcelFile(filename);
-        isWordVisible = false;
-        
-        // 【新增】強制切換到「必懂寫生字」分頁
-        currentWordSet = "must";
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-tab="must"]').classList.add('active');
-        
-        // 顯示生字面板，隱藏文章面板
-        document.getElementById("wordPanel").style.display = "block";
-        document.getElementById("articlePanel").style.display = "none";
-        
-        // 刷新生字列表（必懂寫）
-        refreshWordList("must");
-    });
+        // 3. 繫結下拉選單事件
+function bindFileSelect() {
+  // 年級選單改變時，觸發更新課本選單
+  document.getElementById("gradeSelect").addEventListener("change", (e) => {
+    updateFileSelect(e.target.value);
+  });
+
+  // 課本選單改變時，載入 Excel
+  document.getElementById("fileSelect").addEventListener("change", async (e) => {
+    const filename = e.target.value;
+    if (!filename) return;
+    
+    await loadExcelFile(filename);
+    isWordVisible = false;
+    
+    currentWordSet = "must";
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('[data-tab="must"]').classList.add('active');
+    
+    document.getElementById("wordPanel").style.display = "block";
+    document.getElementById("articlePanel").style.display = "none";
+    
+    refreshWordList("must");
+  });
 }
 
         // ===== 輔助函數 =====
