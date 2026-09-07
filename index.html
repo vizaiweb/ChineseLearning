@@ -2554,6 +2554,21 @@ function prevSentence() {
                             </table>
                         \`;
                         container.innerHTML = html;
+                        // 【新增】綁定下拉選單事件
+document.querySelectorAll('.quiz-select').forEach(select => {
+    select.addEventListener('change', function(e) {
+        e.stopPropagation();
+        const idx = parseInt(this.dataset.index, 10);
+        const val = this.value;
+        if (!val) return;
+        if (quizData && quizData[idx] && quizData[idx].userAnswer === null) {
+            quizData[idx].userAnswer = val;
+            quizData[idx].isAnswered = true;
+            renderQuizTable(quizData, 'quizContainer');
+        }
+    });
+});
+
 
                         // 綁定選項點擊事件
                         document.querySelectorAll('.col-option:not(.option-disabled)').forEach(cell => {
