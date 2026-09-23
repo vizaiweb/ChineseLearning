@@ -686,7 +686,7 @@
             height: min(280px, 80vw);
             background: #fffcf0;
             border-radius: 16px;
-            border: 1px solid #ffe0b0;
+            box-shadow: 0 0 0 1px #ffe0b0; 
             overflow: hidden;
             touch-action: none;
         }
@@ -695,11 +695,14 @@
             inset: 0;
         }
         .hw-stage .hw-canvas-layer {
-            position: absolute;
-            inset: 0;
-            touch-action: none;
-            cursor: crosshair;
-        }
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+}
         .hw-char-nav {
             display: flex;
             gap: 10px;
