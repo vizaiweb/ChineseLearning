@@ -680,20 +680,25 @@
             justify-content: center;
             margin-bottom: 12px;
         }
-        .hw-stage {
+                .hw-stage {
             position: relative;
             width: min(280px, 80vw);
             height: min(280px, 80vw);
             background: #fffcf0;
             border-radius: 16px;
-            box-shadow: 0 0 0 1px #ffe0b0; 
+            box-shadow: 0 0 0 1px #ffe0b0;
             overflow: hidden;
             touch-action: none;
         }
-        .hw-stage .hw-writer-layer {
+                .hw-stage .hw-writer-layer {
             position: absolute;
-            inset: 0;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
         }
+        
         .hw-stage .hw-canvas-layer {
     position: absolute;
     top: 0;
@@ -702,6 +707,7 @@
     height: 100%;
     touch-action: none;
     cursor: crosshair;
+            z-index: 3;
 }
         .hw-char-nav {
             display: flex;
@@ -747,10 +753,38 @@
             cursor: not-allowed;
             transform: none;
         }
-        .hw-btn-clear  { background: #b0a090; }
+                .hw-btn-clear  { background: #b0a090; }
         .hw-btn-animate{ background: #22c55e; }
         .hw-btn-toggle { background: #f59e0b; }
         .hw-btn-quiz   { background: #8b5cf6; }
+
+        /* ===== 九宮格虛線層 ===== */
+        .hw-stage .hw-grid-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* ===== 提示文字（位置 B） ===== */
+        .hw-feedback {
+            min-height: 32px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 600;
+            color: #8b6946;
+            padding: 6px 12px;
+            margin-bottom: 8px;
+            transition: color 0.2s;
+            line-height: 1.4;
+        }
+        .hw-feedback.correct { color: #22c55e; }
+        .hw-feedback.wrong   { color: #ef4444; }
+        .hw-feedback.hint    { color: #f59e0b; }
+        .hw-feedback.success { color: #22c55e; font-size: 17px; }
 
         @media (max-width: 550px) {
             .btn-icon {
@@ -879,12 +913,30 @@
 
                 <div id="handwritingPanel" style="display:none;">
                     <div class="hw-progress" id="hwProgress">第 1 字 / 共 1 字</div>
-                    <div class="hw-stage-wrap">
+                                       <div class="hw-stage-wrap">
                         <div class="hw-stage" id="hwStage">
+                            <svg class="hw-grid-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <rect x="0" y="0" width="100" height="100"
+                                      fill="none" stroke="#e0c9a0" stroke-width="1.5"
+                                      vector-effect="non-scaling-stroke"/>
+                                <line x1="0" y1="33.33" x2="100" y2="33.33"
+                                      stroke="#f0d9b5" stroke-width="1" stroke-dasharray="4 4"
+                                      vector-effect="non-scaling-stroke"/>
+                                <line x1="0" y1="66.67" x2="100" y2="66.67"
+                                      stroke="#f0d9b5" stroke-width="1" stroke-dasharray="4 4"
+                                      vector-effect="non-scaling-stroke"/>
+                                <line x1="33.33" y1="0" x2="33.33" y2="100"
+                                      stroke="#f0d9b5" stroke-width="1" stroke-dasharray="4 4"
+                                      vector-effect="non-scaling-stroke"/>
+                                <line x1="66.67" y1="0" x2="66.67" y2="100"
+                                      stroke="#f0d9b5" stroke-width="1" stroke-dasharray="4 4"
+                                      vector-effect="non-scaling-stroke"/>
+                            </svg>
                             <div class="hw-writer-layer" id="hwWriterLayer"></div>
                             <canvas class="hw-canvas-layer" id="hwCanvas"></canvas>
                         </div>
                     </div>
+                    <div id="hwFeedback" class="hw-feedback"></div>
                     <div class="hw-char-nav">
                         <button id="hwPrevCharBtn">◀ 上一個字</button>
                         <button id="hwNextCharBtn">下一個字 ▶</button>
@@ -2707,7 +2759,7 @@
         // ===== 手寫板（路線 1 + 路線 3） =====
         // ============================================================
 
-        const hwState = {
+               const hwState = {
             isOpen: false,
             isQuizMode: false,
             isCharVisible: false,
@@ -2719,7 +2771,10 @@
             isDrawing: false,
             lastX: 0,
             lastY: 0,
-            canvasReady: false
+            canvasReady: false,
+            totalStrokes: 0,
+            currentStroke: 0,
+            mistakeCount: 0
         };
 
         function isCJKChar(ch) {
@@ -2785,15 +2840,24 @@
             if (toggleBtn) toggleBtn.textContent = "✍️ 手寫練習";
         }
 
-        function setupHWCanvas() {
+                function setupHWCanvas() {
             const canvas = document.getElementById("hwCanvas");
             if (!canvas) return;
+            // 面板隱藏時不初始化
+            if (canvas.offsetParent === null) return;
             const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
             const dpr = window.devicePixelRatio || 1;
             const w = Math.max(1, Math.round(rect.width));
             const h = Math.max(1, Math.round(rect.height));
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
+            const newW = w * dpr;
+            const newH = h * dpr;
+            // 尺寸沒變就跳過（但仍確保 ctx 存在）
+            if (canvas.width === newW && canvas.height === newH && hwState.ctx) {
+                return;
+            }
+            canvas.width = newW;
+            canvas.height = newH;
             const ctx = canvas.getContext("2d");
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.lineCap = "round";
@@ -2898,6 +2962,10 @@
             hwState.isCharVisible = false;
             hwState.isAnimating = false;
             clearHWCanvas();
+            // 重置提示與進度
+            hwSetFeedback("", "");
+            hwState.totalStrokes = 0;
+            hwState.currentStroke = 0;
 
             const ch = hwState.chars[hwState.currentCharIdx];
             if (!ch) return;
@@ -2963,24 +3031,27 @@
             loadHWChar();
         }
 
-        function hwClear() {
+                function hwClear() {
             clearHWCanvas();
             if (hwState.isQuizMode && hwState.writer) {
                 try {
                     hwState.writer.cancelQuiz();
                     setTimeout(() => {
-                        if (hwState.isQuizMode) hwState.writer.quiz();
+                        if (hwState.isQuizMode) {
+                            hwEnterQuiz();
+                        }
                     }, 100);
                 } catch (e) {}
             }
         }
 
-        function hwAnimate() {
+              function hwAnimate() {
             if (!hwState.writer || hwState.isAnimating) return;
             if (hwState.isQuizMode) {
                 hwExitQuiz();
             }
             clearHWCanvas();
+            hwSetFeedback("", "");
             hwState.isCharVisible = true;
             updateHWToggleCharBtnText();
             try { hwState.writer.showCharacter(); } catch (e) {}
@@ -3012,33 +3083,127 @@
             updateHWToggleCharBtnText();
         }
 
+               function hwSetFeedback(text, type) {
+            const el = document.getElementById("hwFeedback");
+            if (!el) return;
+            el.textContent = text;
+            el.className = "hw-feedback" + (type ? " " + type : "");
+        }
+
+        function hwUpdateQuizProgress() {
+            if (!hwState.isQuizMode) return;
+            if (hwState.totalStrokes === 0) return;
+            const cur = Math.min(hwState.currentStroke, hwState.totalStrokes);
+            hwSetFeedback(`✍️ 第 ${cur} / ${hwState.totalStrokes} 筆`, "");
+        }
+
+        function hwPlayCorrectSound() {
+            playBeep(880, 0.1);
+        }
+        function hwPlayWrongSound() {
+            playBeep(220, 0.3);
+        }
+        function hwPlayCompleteSound() {
+            playBeep(880, 0.15);
+            setTimeout(() => playBeep(1100, 0.15), 150);
+            setTimeout(() => playBeep(1320, 0.25), 300);
+        }
+
         function hwEnterQuiz() {
             if (!hwState.writer) return;
             hwState.isQuizMode = true;
             hwState.isCharVisible = false;
+            hwState.currentStroke = 0;
+            hwState.mistakeCount = 0;
             updateHWToggleCharBtnText();
             clearHWCanvas();
+
+            // 取得總筆數
+            try {
+                const charData = hwState.writer.getCharacterData ?
+                    hwState.writer.getCharacterData() : null;
+                if (charData && charData.strokes) {
+                    hwState.totalStrokes = charData.strokes.length;
+                } else {
+                    hwState.totalStrokes = 0;
+                }
+            } catch (e) {
+                hwState.totalStrokes = 0;
+            }
+
+            hwSetFeedback(
+                hwState.totalStrokes > 0
+                    ? `✍️ 第 0 / ${hwState.totalStrokes} 筆`
+                    : "✍️ 請按正確筆順書寫",
+                ""
+            );
+
             try {
                 hwState.writer.hideCharacter();
                 hwState.writer.quiz({
+                    leniency: 1.2,
+                    showHintAfterMisses: 3,
+                    highlightOnComplete: true,
+                    highlightColor: "#ffaa66",
+                    markStrokeCorrectAfterMisses: 100,
+                    onCorrectStroke: (strokeData) => {
+                        // 寫對一筆：清空自由書寫層
+                        clearHWCanvas();
+                        hwState.currentStroke++;
+                        hwState.mistakeCount = 0;
+                        hwPlayCorrectSound();
+                        hwUpdateQuizProgress();
+                    },
+                    onMistake: (strokeData) => {
+                        // 寫錯：清空自由書寫層
+                        clearHWCanvas();
+                        hwState.mistakeCount++;
+                        hwPlayWrongSound();
+                        const misses = strokeData && strokeData.mistakes !== undefined
+                            ? strokeData.mistakes : 0;
+                        if (misses >= 3) {
+                            hwSetFeedback("💡 提示：跟著閃爍的筆畫寫", "hint");
+                        } else {
+                            hwSetFeedback("❌ 筆順不對，再試一次", "wrong");
+                        }
+                    },
                     onComplete: (summary) => {
-                        console.log("quiz complete", summary);
+                        const mistakes = summary && summary.totalMistakes !== undefined
+                            ? summary.totalMistakes : 0;
+                        hwPlayCompleteSound();
+                        clearHWCanvas();
+                        const isLast = hwState.currentCharIdx >= hwState.chars.length - 1;
+                        if (isLast) {
+                            hwSetFeedback(
+                                `🎉 全部完成！共錯 ${mistakes} 次`,
+                                "success"
+                            );
+                        } else {
+                            hwSetFeedback(
+                                `✅ 完成！共錯 ${mistakes} 次　按 ▶ 練習下一個字`,
+                                "success"
+                            );
+                        }
                     }
                 });
             } catch (e) {
                 console.warn("quiz 啟動失敗", e);
                 hwState.isQuizMode = false;
+                hwSetFeedback("", "");
             }
             updateHWToolbarState();
         }
 
-        function hwExitQuiz() {
+               function hwExitQuiz() {
             if (!hwState.writer) return;
             try { hwState.writer.cancelQuiz(); } catch (e) {}
             hwState.isQuizMode = false;
             hwState.isCharVisible = false;
+            hwState.currentStroke = 0;
+            hwState.mistakeCount = 0;
             updateHWToggleCharBtnText();
             clearHWCanvas();
+            hwSetFeedback("", "");
             updateHWToolbarState();
         }
 
