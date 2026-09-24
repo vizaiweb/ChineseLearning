@@ -753,11 +753,11 @@
             cursor: not-allowed;
             transform: none;
         }
-                                .hw-btn-clear  { background: #b0a090; }
+        
+        .hw-btn-clear  { background: #b0a090; }
         .hw-btn-animate{ background: #22c55e; }
-        .hw-btn-toggle { background: #f59e0b; }
-        .hw-btn-erase  { background: #3b7cbf; }
-        .hw-btn-erase.active { background: #8b5cf6; }
+        .hw-btn-toggle { background: #22c55e; }
+        .hw-btn-erase  { background: #b0a090; }
 
         /* ===== 九宮格虛線層 ===== */
         .hw-stage .hw-grid-layer {
@@ -3097,15 +3097,13 @@
         }
 
        
-               function updateHWEraseBtnText() {
+                       function updateHWEraseBtnText() {
             const btn = document.getElementById("hwEraseBtn");
             if (!btn) return;
             if (hwState.isErasing) {
                 btn.textContent = "✏️ 書寫模式";
-                btn.classList.add("active");
             } else {
                 btn.textContent = "🚿 橡皮擦";
-                btn.classList.remove("active");
             }
         }
 
