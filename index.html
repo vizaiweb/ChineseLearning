@@ -756,7 +756,7 @@
                                 .hw-btn-clear  { background: #b0a090; }
         .hw-btn-animate{ background: #22c55e; }
         .hw-btn-toggle { background: #f59e0b; }
-        .hw-btn-erase  { background: #6b7280; }
+        .hw-btn-erase  { background: #3b7cbf; }
         .hw-btn-erase.active { background: #8b5cf6; }
 
         /* ===== 九宮格虛線層 ===== */
@@ -942,11 +942,11 @@
                         <button id="hwPrevCharBtn">◀ 上一個字</button>
                         <button id="hwNextCharBtn">下一個字 ▶</button>
                     </div>
-                    <div class="hw-toolbar">
+                                        <div class="hw-toolbar">
                         <button id="hwClearBtn"   class="hw-btn-clear">🔄 清除重寫</button>
+                        <button id="hwEraseBtn"   class="hw-btn-erase">🚿 橡皮擦</button>
                         <button id="hwAnimateBtn" class="hw-btn-animate">▶️ 播放筆順</button>
                         <button id="hwToggleCharBtn" class="hw-btn-toggle">👁️ 顯示範字</button>
-                        <button id="hwEraseBtn"   class="hw-btn-erase">🧽 橡皮擦</button>
                     </div>
                 </div>
             </div>
@@ -3097,14 +3097,14 @@
         }
 
        
-        function updateHWEraseBtnText() {
+               function updateHWEraseBtnText() {
             const btn = document.getElementById("hwEraseBtn");
             if (!btn) return;
             if (hwState.isErasing) {
                 btn.textContent = "✏️ 書寫模式";
                 btn.classList.add("active");
             } else {
-                btn.textContent = "🧽 橡皮擦";
+                btn.textContent = "🚿 橡皮擦";
                 btn.classList.remove("active");
             }
         }
