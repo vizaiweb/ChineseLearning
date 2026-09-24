@@ -2867,11 +2867,11 @@
         }
 
         // 依據目前模式（書寫 / 橡皮擦）設定 ctx
-              function applyHWBrushMode(ctx) {
+                     function applyHWBrushMode(ctx) {
             if (!ctx) return;
             if (hwState.isErasing) {
                 ctx.globalCompositeOperation = "destination-out";
-                ctx.lineWidth = 30;
+                ctx.lineWidth = 20;
                 ctx.strokeStyle = "rgba(0,0,0,1)";
                 ctx.fillStyle = "rgba(0,0,0,1)";
             } else {
@@ -2894,7 +2894,7 @@
                 return { x: clientX - rect.left, y: clientY - rect.top };
             };
 
-            canvas.addEventListener("pointerdown", (e) => {
+                      canvas.addEventListener("pointerdown", (e) => {
                 if (hwState.isAnimating) return;
                 e.preventDefault();
                 canvas.setPointerCapture(e.pointerId);
@@ -2903,7 +2903,7 @@
                 hwState.lastX = p.x;
                 hwState.lastY = p.y;
                 // 點一下也畫一個點（橡皮擦模式下為大圓）
-                const r = hwState.isErasing ? 15 : 4;
+                const r = hwState.isErasing ? 10 : 4;
                 hwState.ctx.beginPath();
                 hwState.ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
                 hwState.ctx.fill();
