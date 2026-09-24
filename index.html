@@ -2867,7 +2867,7 @@
         }
 
         // 依據目前模式（書寫 / 橡皮擦）設定 ctx
-        function applyHWBrushMode(ctx) {
+              function applyHWBrushMode(ctx) {
             if (!ctx) return;
             if (hwState.isErasing) {
                 ctx.globalCompositeOperation = "destination-out";
@@ -2877,8 +2877,8 @@
             } else {
                 ctx.globalCompositeOperation = "source-over";
                 ctx.lineWidth = 8;
-                ctx.strokeStyle = "#c7362b";
-                ctx.fillStyle = "#c7362b";
+                ctx.strokeStyle = "#1e40af";
+                ctx.fillStyle = "#1e40af";
             }
         }
 
