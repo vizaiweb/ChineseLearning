@@ -753,10 +753,11 @@
             cursor: not-allowed;
             transform: none;
         }
-                .hw-btn-clear  { background: #b0a090; }
+                                .hw-btn-clear  { background: #b0a090; }
         .hw-btn-animate{ background: #22c55e; }
         .hw-btn-toggle { background: #f59e0b; }
-        .hw-btn-quiz   { background: #8b5cf6; }
+        .hw-btn-erase  { background: #6b7280; }
+        .hw-btn-erase.active { background: #8b5cf6; }
 
         /* ===== 九宮格虛線層 ===== */
         .hw-stage .hw-grid-layer {
@@ -945,7 +946,7 @@
                         <button id="hwClearBtn"   class="hw-btn-clear">🔄 清除重寫</button>
                         <button id="hwAnimateBtn" class="hw-btn-animate">▶️ 播放筆順</button>
                         <button id="hwToggleCharBtn" class="hw-btn-toggle">👁️ 顯示範字</button>
-                        <button id="hwQuizBtn"    class="hw-btn-quiz">🎯 測驗模式</button>
+                        <button id="hwEraseBtn"   class="hw-btn-erase">🧽 橡皮擦</button>
                     </div>
                 </div>
             </div>
@@ -2759,11 +2760,11 @@
         // ===== 手寫板（路線 1 + 路線 3） =====
         // ============================================================
 
-               const hwState = {
+                       const hwState = {
             isOpen: false,
-            isQuizMode: false,
             isCharVisible: false,
             isAnimating: false,
+            isErasing: false,
             chars: [],
             currentCharIdx: 0,
             writer: null,
@@ -2771,10 +2772,7 @@
             isDrawing: false,
             lastX: 0,
             lastY: 0,
-            canvasReady: false,
-            totalStrokes: 0,
-            currentStroke: 0,
-            mistakeCount: 0
+            canvasReady: false
         };
 
         function isCJKChar(ch) {
@@ -2815,7 +2813,7 @@
             }
         }
 
-        function expandHandwriting() {
+               function expandHandwriting() {
             const panel = document.getElementById("handwritingPanel");
             panel.style.display = "block";
             hwState.isOpen = true;
@@ -2823,27 +2821,28 @@
 
             setupHWCanvas();
             loadHandwritingForCurrentWord();
+            updateHWEraseBtnText();
         }
 
-        function collapseHandwriting() {
+                function collapseHandwriting() {
             const panel = document.getElementById("handwritingPanel");
             if (panel) panel.style.display = "none";
             hwState.isOpen = false;
-            hwState.isQuizMode = false;
             hwState.isCharVisible = false;
             hwState.isAnimating = false;
+            hwState.isErasing = false;
             hwState.chars = [];
             hwState.currentCharIdx = 0;
+            hwState.isDrawing = false;
             destroyHWWriter();
             clearHWCanvas();
             const toggleBtn = document.getElementById("toggleHandwritingBtn");
             if (toggleBtn) toggleBtn.textContent = "✍️ 手寫練習";
         }
 
-                function setupHWCanvas() {
+                        function setupHWCanvas() {
             const canvas = document.getElementById("hwCanvas");
             if (!canvas) return;
-            // 面板隱藏時不初始化
             if (canvas.offsetParent === null) return;
             const rect = canvas.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) return;
@@ -2852,7 +2851,6 @@
             const h = Math.max(1, Math.round(rect.height));
             const newW = w * dpr;
             const newH = h * dpr;
-            // 尺寸沒變就跳過（但仍確保 ctx 存在）
             if (canvas.width === newW && canvas.height === newH && hwState.ctx) {
                 return;
             }
@@ -2862,14 +2860,29 @@
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
-            ctx.lineWidth = 8;
-            ctx.strokeStyle = "#c7362b";
+            applyHWBrushMode(ctx);
             hwState.ctx = ctx;
             hwState.canvasReady = true;
             bindHWDrawingEvents(canvas);
         }
 
-        let hwCanvasEventsBound = false;
+        // 依據目前模式（書寫 / 橡皮擦）設定 ctx
+        function applyHWBrushMode(ctx) {
+            if (!ctx) return;
+            if (hwState.isErasing) {
+                ctx.globalCompositeOperation = "destination-out";
+                ctx.lineWidth = 30;
+                ctx.strokeStyle = "rgba(0,0,0,1)";
+                ctx.fillStyle = "rgba(0,0,0,1)";
+            } else {
+                ctx.globalCompositeOperation = "source-over";
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = "#c7362b";
+                ctx.fillStyle = "#c7362b";
+            }
+        }
+
+               let hwCanvasEventsBound = false;
         function bindHWDrawingEvents(canvas) {
             if (hwCanvasEventsBound) return;
             hwCanvasEventsBound = true;
@@ -2889,9 +2902,10 @@
                 const p = getPos(e);
                 hwState.lastX = p.x;
                 hwState.lastY = p.y;
+                // 點一下也畫一個點（橡皮擦模式下為大圓）
+                const r = hwState.isErasing ? 15 : 4;
                 hwState.ctx.beginPath();
-                hwState.ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                hwState.ctx.fillStyle = "#c7362b";
+                hwState.ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
                 hwState.ctx.fill();
             });
 
@@ -2921,11 +2935,14 @@
             });
         }
 
-        function clearHWCanvas() {
+               function clearHWCanvas() {
             const canvas = document.getElementById("hwCanvas");
             if (!canvas || !hwState.ctx) return;
             const dpr = window.devicePixelRatio || 1;
+            const prev = hwState.ctx.globalCompositeOperation;
+            hwState.ctx.globalCompositeOperation = "source-over";
             hwState.ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            hwState.ctx.globalCompositeOperation = prev;
         }
 
         function destroyHWWriter() {
@@ -2953,19 +2970,17 @@
             updateHWToolbarState();
         }
 
-        function loadHWChar() {
+                function loadHWChar() {
             const layer = document.getElementById("hwWriterLayer");
             if (!layer) return;
             layer.innerHTML = "";
             hwState.writer = null;
-            hwState.isQuizMode = false;
             hwState.isCharVisible = false;
             hwState.isAnimating = false;
+            hwState.isErasing = false;
+            hwState.isDrawing = false;
             clearHWCanvas();
-            // 重置提示與進度
             hwSetFeedback("", "");
-            hwState.totalStrokes = 0;
-            hwState.currentStroke = 0;
 
             const ch = hwState.chars[hwState.currentCharIdx];
             if (!ch) return;
@@ -2990,14 +3005,17 @@
                     },
                     onLoadCharDataError: () => {
                         console.warn("HanziWriter: 無法載入字型資料", ch);
-                        disableHWStrokeButtons(true);
                     }
                 });
-                disableHWStrokeButtons(false);
             } catch (e) {
                 console.warn("HanziWriter 建立失敗：", e);
-                disableHWStrokeButtons(true);
             }
+
+            // 確保筆刷恢復書寫模式
+            if (hwState.ctx) {
+                applyHWBrushMode(hwState.ctx);
+            }
+            updateHWEraseBtnText();
 
             document.getElementById("hwProgress").textContent =
                 `第 ${hwState.currentCharIdx + 1} 字 / 共 ${hwState.chars.length} 字`;
@@ -3005,12 +3023,7 @@
             updateHWToolbarState();
         }
 
-        function disableHWStrokeButtons(disabled) {
-            const a = document.getElementById("hwAnimateBtn");
-            const q = document.getElementById("hwQuizBtn");
-            if (a) a.disabled = disabled;
-            if (q) q.disabled = disabled;
-        }
+      
 
         function updateHWCharNav() {
             const prevBtn = document.getElementById("hwPrevCharBtn");
@@ -3031,24 +3044,17 @@
             loadHWChar();
         }
 
-                function hwClear() {
+                 function hwClear() {
             clearHWCanvas();
-            if (hwState.isQuizMode && hwState.writer) {
-                try {
-                    hwState.writer.cancelQuiz();
-                    setTimeout(() => {
-                        if (hwState.isQuizMode) {
-                            hwEnterQuiz();
-                        }
-                    }, 100);
-                } catch (e) {}
-            }
         }
 
-              function hwAnimate() {
+                      function hwAnimate() {
             if (!hwState.writer || hwState.isAnimating) return;
-            if (hwState.isQuizMode) {
-                hwExitQuiz();
+            // 播放筆順時強制回到書寫模式
+            if (hwState.isErasing) {
+                hwState.isErasing = false;
+                if (hwState.ctx) applyHWBrushMode(hwState.ctx);
+                updateHWEraseBtnText();
             }
             clearHWCanvas();
             hwSetFeedback("", "");
@@ -3090,141 +3096,39 @@
             el.className = "hw-feedback" + (type ? " " + type : "");
         }
 
-        function hwUpdateQuizProgress() {
-            if (!hwState.isQuizMode) return;
-            if (hwState.totalStrokes === 0) return;
-            const cur = Math.min(hwState.currentStroke, hwState.totalStrokes);
-            hwSetFeedback(`✍️ 第 ${cur} / ${hwState.totalStrokes} 筆`, "");
-        }
-
-        function hwPlayCorrectSound() {
-            playBeep(880, 0.1);
-        }
-        function hwPlayWrongSound() {
-            playBeep(220, 0.3);
-        }
-        function hwPlayCompleteSound() {
-            playBeep(880, 0.15);
-            setTimeout(() => playBeep(1100, 0.15), 150);
-            setTimeout(() => playBeep(1320, 0.25), 300);
-        }
-
-        function hwEnterQuiz() {
-            if (!hwState.writer) return;
-            hwState.isQuizMode = true;
-            hwState.isCharVisible = false;
-            hwState.currentStroke = 0;
-            hwState.mistakeCount = 0;
-            updateHWToggleCharBtnText();
-            clearHWCanvas();
-
-            // 取得總筆數
-            try {
-                const charData = hwState.writer.getCharacterData ?
-                    hwState.writer.getCharacterData() : null;
-                if (charData && charData.strokes) {
-                    hwState.totalStrokes = charData.strokes.length;
-                } else {
-                    hwState.totalStrokes = 0;
-                }
-            } catch (e) {
-                hwState.totalStrokes = 0;
-            }
-
-            hwSetFeedback(
-                hwState.totalStrokes > 0
-                    ? `✍️ 第 0 / ${hwState.totalStrokes} 筆`
-                    : "✍️ 請按正確筆順書寫",
-                ""
-            );
-
-            try {
-                hwState.writer.hideCharacter();
-                hwState.writer.quiz({
-                    leniency: 1.2,
-                    showHintAfterMisses: 3,
-                    highlightOnComplete: true,
-                    highlightColor: "#ffaa66",
-                    markStrokeCorrectAfterMisses: 100,
-                    onCorrectStroke: (strokeData) => {
-                        // 寫對一筆：清空自由書寫層
-                        clearHWCanvas();
-                        hwState.currentStroke++;
-                        hwState.mistakeCount = 0;
-                        hwPlayCorrectSound();
-                        hwUpdateQuizProgress();
-                    },
-                    onMistake: (strokeData) => {
-                        // 寫錯：清空自由書寫層
-                        clearHWCanvas();
-                        hwState.mistakeCount++;
-                        hwPlayWrongSound();
-                        const misses = strokeData && strokeData.mistakes !== undefined
-                            ? strokeData.mistakes : 0;
-                        if (misses >= 3) {
-                            hwSetFeedback("💡 提示：跟著閃爍的筆畫寫", "hint");
-                        } else {
-                            hwSetFeedback("❌ 筆順不對，再試一次", "wrong");
-                        }
-                    },
-                    onComplete: (summary) => {
-                        const mistakes = summary && summary.totalMistakes !== undefined
-                            ? summary.totalMistakes : 0;
-                        hwPlayCompleteSound();
-                        clearHWCanvas();
-                        const isLast = hwState.currentCharIdx >= hwState.chars.length - 1;
-                        if (isLast) {
-                            hwSetFeedback(
-                                `🎉 全部完成！共錯 ${mistakes} 次`,
-                                "success"
-                            );
-                        } else {
-                            hwSetFeedback(
-                                `✅ 完成！共錯 ${mistakes} 次　按 ▶ 練習下一個字`,
-                                "success"
-                            );
-                        }
-                    }
-                });
-            } catch (e) {
-                console.warn("quiz 啟動失敗", e);
-                hwState.isQuizMode = false;
-                hwSetFeedback("", "");
-            }
-            updateHWToolbarState();
-        }
-
-               function hwExitQuiz() {
-            if (!hwState.writer) return;
-            try { hwState.writer.cancelQuiz(); } catch (e) {}
-            hwState.isQuizMode = false;
-            hwState.isCharVisible = false;
-            hwState.currentStroke = 0;
-            hwState.mistakeCount = 0;
-            updateHWToggleCharBtnText();
-            clearHWCanvas();
-            hwSetFeedback("", "");
-            updateHWToolbarState();
-        }
-
-        function hwToggleQuiz() {
-            if (hwState.isQuizMode) {
-                hwExitQuiz();
+       
+        function updateHWEraseBtnText() {
+            const btn = document.getElementById("hwEraseBtn");
+            if (!btn) return;
+            if (hwState.isErasing) {
+                btn.textContent = "✏️ 書寫模式";
+                btn.classList.add("active");
             } else {
-                hwEnterQuiz();
+                btn.textContent = "🧽 橡皮擦";
+                btn.classList.remove("active");
             }
         }
 
-        function updateHWToolbarState() {
-            const quizBtn = document.getElementById("hwQuizBtn");
+        function hwToggleErase() {
+            hwState.isErasing = !hwState.isErasing;
+            // 結束當前筆畫
+            hwState.isDrawing = false;
+            // 更新 ctx 筆刷
+            if (hwState.ctx) {
+                applyHWBrushMode(hwState.ctx);
+            }
+            updateHWEraseBtnText();
+        }
+      
+
+               function updateHWToolbarState() {
             const animBtn = document.getElementById("hwAnimateBtn");
             const clearBtn = document.getElementById("hwClearBtn");
-            if (quizBtn) quizBtn.textContent = hwState.isQuizMode ? "⏹️ 結束測驗" : "🎯 測驗模式";
-            if (animBtn) animBtn.disabled = hwState.isAnimating || hwState.isQuizMode;
+            if (animBtn) animBtn.disabled = hwState.isAnimating;
             if (clearBtn) clearBtn.disabled = hwState.isAnimating;
         }
 
-        function bindHandwritingEvents() {
+               function bindHandwritingEvents() {
             const toggle = document.getElementById("toggleHandwritingBtn");
             if (toggle) toggle.onclick = toggleHandwritingPanel;
             const clearBtn = document.getElementById("hwClearBtn");
@@ -3233,8 +3137,8 @@
             if (animBtn) animBtn.onclick = hwAnimate;
             const toggleCharBtn = document.getElementById("hwToggleCharBtn");
             if (toggleCharBtn) toggleCharBtn.onclick = hwToggleChar;
-            const quizBtn = document.getElementById("hwQuizBtn");
-            if (quizBtn) quizBtn.onclick = hwToggleQuiz;
+            const eraseBtn = document.getElementById("hwEraseBtn");
+            if (eraseBtn) eraseBtn.onclick = hwToggleErase;
             const prevCharBtn = document.getElementById("hwPrevCharBtn");
             if (prevCharBtn) prevCharBtn.onclick = hwPrevChar;
             const nextCharBtn = document.getElementById("hwNextCharBtn");
@@ -3248,14 +3152,12 @@
                     setupHWCanvas();
                     if (hwState.chars.length > 0) {
                         const savedVisible = hwState.isCharVisible;
-                        const savedQuiz = hwState.isQuizMode;
                         loadHWChar();
                         if (savedVisible) {
                             hwState.isCharVisible = true;
                             try { hwState.writer.showCharacter(); } catch (e) {}
                             updateHWToggleCharBtnText();
                         }
-                        if (savedQuiz) hwEnterQuiz();
                     }
                 }, 250);
             });
