@@ -1249,7 +1249,7 @@
 
         let gradeData = {};
 
-                async function loadFileList() {
+                        async function loadFileList() {
             try {
                 const listUrl = `${DATA_PATH}fileList.json`;
                 const res = await fetch(listUrl);
@@ -1261,8 +1261,14 @@
                 if (data.schools && Array.isArray(data.schools)) {
                     data.schools.forEach(school => {
                         const option = document.createElement('option');
-                        option.value = school;
-                        option.textContent = school;
+                        // 支援兩種格式：純字串 或 { id, name }
+                        if (typeof school === 'string') {
+                            option.value = school;
+                            option.textContent = school;
+                        } else {
+                            option.value = school.id;
+                            option.textContent = school.name || school.id;
+                        }
                         schoolSelect.appendChild(option);
                     });
                 }
