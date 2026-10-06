@@ -1,28 +1,3 @@
 {
-  "P2": [
-    "P2T3_Chapter9.xlsx",
-    "P2T3_Chapter10.xlsx",
-    "P2T3_Chapter11.xlsx",
-    "P2T3_Chapter12.xlsx",
-    "P2T3_Chapter13.xlsx",
-    "P2T3_Chapter14.xlsx",
-    "P2T3_Chapter16.xlsx",
-    "P2T3_Chapter17.xlsx",
-    "P2T3_Chapter18.xlsx",
-    "P2T3_Chapter19.xlsx",
-    "P2T3_Chapter20.xlsx"
-  ],
-  "P3": [
-    "P3T1_Chapter1.xlsx",
-    "P3T1_Chapter2.xlsx",
-    "P3T1_Chapter3.xlsx",
-    "P3T1_Chapter4.xlsx",
-    "P3T1_Chapter4.1.xlsx",
-    "P3T1_Chapter5.xlsx",
-    "P3T1_Chapter6.xlsx",
-    "P3T1_Chapter7.xlsx",
-    "P3T1_Chapter8.xlsx",
-    "P3T1_Chapter9.xlsx",
-    "P3T1_Chapter10.xlsx"
-  ]
+  "schools": ["srl", "A 校"]
 }
