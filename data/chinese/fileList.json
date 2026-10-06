@@ -1,3 +1,6 @@
 {
-  "schools": ["srl", "A 校"]
+  "schools": [
+    { "id": "srl", "name": "srl" },
+    { "id": "A 校", "name": "A 校（待加入檔案）" }
+  ]
 }
