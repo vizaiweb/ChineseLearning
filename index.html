@@ -871,13 +871,18 @@
             <h1>📖 小學中文樂園</h1>
         </div>
 
-        <div class="select-section">
+                <div class="select-section">
+            <div class="select-row">
+                <label>🏫 學校:</label>
+                <select id="schoolSelect">
+                    <option value="">-- 請選擇學校 --</option>
+                </select>
+            </div>
+
             <div class="select-row">
                 <label>🎓 年級:</label>
-                <select id="gradeSelect">
-                    <option value="">-- 請選擇年級 --</option>
-                    <option value="P2">二年級</option>
-                    <option value="P3">三年級</option>
+                <select id="gradeSelect" disabled>
+                    <option value="">-- 請先選擇學校 --</option>
                 </select>
             </div>
 
@@ -1026,6 +1031,7 @@
         let allOnlyWords = [];
         let articles = [];
 
+        let currentSchool = "";
         let currentWordSet = "must";
         let currentFilteredWords = [];
         let currentWordIndex = 0;
@@ -1243,18 +1249,85 @@
 
         let gradeData = {};
 
-        async function loadFileList() {
+                async function loadFileList() {
             try {
                 const listUrl = `${DATA_PATH}fileList.json`;
                 const res = await fetch(listUrl);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                gradeData = await res.json();
+                const data = await res.json();
+                // 填充學校下拉選單
+                const schoolSelect = document.getElementById('schoolSelect');
+                schoolSelect.innerHTML = '<option value="">-- 請選擇學校 --</option>';
+                if (data.schools && Array.isArray(data.schools)) {
+                    data.schools.forEach(school => {
+                        const option = document.createElement('option');
+                        option.value = school;
+                        option.textContent = school;
+                        schoolSelect.appendChild(option);
+                    });
+                }
             } catch (e) {
                 console.warn("無法讀取 fileList.json", e);
-                document.getElementById('fileSelect').innerHTML = '<option value="">無法載入清單</option>';
+                document.getElementById('schoolSelect').innerHTML = '<option value="">無法載入學校清單</option>';
             }
         }
 
+                // 載入指定學校的 fileList.json，並填充年級下拉選單
+        async function loadGradeList(school) {
+            const gradeSelect = document.getElementById('gradeSelect');
+            const fileSelect = document.getElementById('fileSelect');
+            
+            // 重置年級和課本
+            gradeSelect.innerHTML = '<option value="">-- 請選擇年級 --</option>';
+            fileSelect.innerHTML = '<option value="">-- 請先選擇年級 --</option>';
+            fileSelect.disabled = true;
+            
+            if (!school) {
+                gradeSelect.disabled = true;
+                gradeSelect.innerHTML = '<option value="">-- 請先選擇學校 --</option>';
+                gradeData = {};
+                return;
+            }
+
+            try {
+                const url = `${DATA_PATH}${encodeURIComponent(school)}/fileList.json`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                gradeData = await res.json();
+                
+                // 填充年級下拉選單
+                const grades = Object.keys(gradeData);
+                if (grades.length === 0) {
+                    gradeSelect.innerHTML = '<option value="">-- 此校暫無年級 --</option>';
+                    gradeSelect.disabled = true;
+                    return;
+                }
+                
+                gradeSelect.innerHTML = '<option value="">-- 請選擇年級 --</option>';
+                grades.forEach(g => {
+                    const option = document.createElement('option');
+                    option.value = g;
+                    // 將 P2 顯示為「二年級」，P3 顯示為「三年級」
+                    let displayName = g;
+                    if (g === 'P2') displayName = '二年級';
+                    else if (g === 'P3') displayName = '三年級';
+                    else if (g === 'P1') displayName = '一年級';
+                    else if (g === 'P4') displayName = '四年級';
+                    else if (g === 'P5') displayName = '五年級';
+                    else if (g === 'P6') displayName = '六年級';
+                    option.textContent = displayName;
+                    gradeSelect.appendChild(option);
+                });
+                gradeSelect.disabled = false;
+            } catch (e) {
+                console.warn(`無法讀取 ${school}/fileList.json`, e);
+                gradeSelect.innerHTML = '<option value="">無法載入年級</option>';
+                gradeSelect.disabled = true;
+                gradeData = {};
+            }
+        }
+
+        // 根據選定的年級，填充課本下拉選單
         function updateFileSelect(grade) {
             const fileSelect = document.getElementById('fileSelect');
             fileSelect.innerHTML = '<option value="">-- 請選擇單元 --</option>';
@@ -1275,10 +1348,11 @@
             fileSelect.disabled = (files.length === 0);
         }
 
-        async function loadExcelFile(filename) {
+                async function loadExcelFile(filename) {
             if (!filename) return false;
             currentFileName = filename;
-            const url = `${DATA_PATH}${filename}`;
+            const grade = document.getElementById('gradeSelect').value;
+            const url = `${DATA_PATH}${encodeURIComponent(currentSchool)}/${encodeURIComponent(grade)}/${filename}`;
             try {
                 const resp = await fetch(url);
                 if (!resp.ok) throw new Error(`下載失敗 ${resp.status}`);
@@ -3354,11 +3428,19 @@
             });
         }
 
-        function bindFileSelect() {
+                function bindFileSelect() {
+            // 學校選單：改變時載入該校的年級清單
+            document.getElementById("schoolSelect").addEventListener("change", async (e) => {
+                currentSchool = e.target.value;
+                await loadGradeList(currentSchool);
+            });
+
+            // 年級選單：改變時填充課本清單
             document.getElementById("gradeSelect").addEventListener("change", (e) => {
                 updateFileSelect(e.target.value);
             });
 
+            // 課本選單：改變時載入 Excel
             document.getElementById("fileSelect").addEventListener("change", async (e) => {
                 const filename = e.target.value;
                 if (!filename) return;
