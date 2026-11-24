@@ -982,6 +982,10 @@
                     <div class="builder-toggle-btn">
                         <button id="toggleBuilderBtn">📝 句子重組練習</button>
                     </div>
+                    <!-- 新增：YouTube 影片按鈕容器（預設隱藏） -->
+                    <div class="builder-toggle-btn" id="articleLinkContainer" style="display:none;">
+                        <button id="articleYoutubeBtn">🎬 觀看影片</button>
+                    </div>
                     <div id="builderContent" class="builder-container">
                         <div class="builder-header">
                             <span class="title">✏️ 句子重組練習</span>
@@ -1390,7 +1394,8 @@
                     articles = rows.map(row => ({
                         title: String(row["標題"] || row["标题"] || "無題").trim(),
                         content: String(row["文章"] || row["内容"] || "").trim(),
-                        explanation: String(row["解釋"] || row["explanation"] || "").trim()
+                        explanation: String(row["解釋"] || row["explanation"] || "").trim(),
+                        link: String(row["鏈結"] || "").trim()
                     })).filter(a => a.title && a.content);
                 } else articles = [];
 
@@ -1503,6 +1508,17 @@
             } else {
                 contentDiv.innerHTML = "<em>📖 文章已隱藏，點擊「顯示文章」</em>";
                 explanationBox.style.display = 'none';
+            }
+
+            // 新增：控制 YouTube 影片按鈕顯示／隱藏
+            const linkBox = document.getElementById("articleLinkContainer");
+            const linkBtn = document.getElementById("articleYoutubeBtn");
+            if (art && art.link && art.link.trim() !== "") {
+                linkBox.style.display = "block";
+                linkBtn.dataset.url = art.link;
+            } else {
+                linkBox.style.display = "none";
+                linkBtn.dataset.url = "";
             }
 
             const readExplanationBtn = document.getElementById("readExplanationBtn");
@@ -3357,6 +3373,13 @@
             document.getElementById("readArticleBtn").onclick = () => readArticleOnce();
             document.getElementById("toggleArticleBtn").onclick = () => toggleArticleVisibility();
             document.getElementById("readExplanationBtn").onclick = () => readExplanationOnce();
+
+            // 新增：YouTube 影片按鈕點擊事件
+            document.getElementById("articleYoutubeBtn").onclick = () => {
+                const url = document.getElementById("articleYoutubeBtn").dataset.url;
+                if (!url) return;
+                window.open(url, "_blank", "noopener,noreferrer");
+            };
 
             document.getElementById("toggleBuilderBtn").onclick = function() {
                 const content = document.getElementById("builderContent");
