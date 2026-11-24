@@ -1592,14 +1592,30 @@
             button.classList.add('reading-disabled');
             isCantoneseReading = true;
             ensureCantoneseEngine(() => {
-                currentCancelFunction = speakCantoneseOnce(art.content, () => {
-                    button.textContent = "🔊 朗讀";
-                    button.classList.remove('reading-disabled');
-                    isCantoneseReading = false;
-                    currentCantoneseButton = null;
-                    currentCancelFunction = null;
-                });
-            });
+    const titleText = (art.title || "").trim();
+
+    const readContent = () => {
+        if (!isCantoneseReading) return;
+        currentCancelFunction = speakCantoneseOnce(art.content, () => {
+            button.textContent = "🔊 朗讀";
+            button.classList.remove('reading-disabled');
+            isCantoneseReading = false;
+            currentCantoneseButton = null;
+            currentCancelFunction = null;
+        });
+    };
+
+    const afterTitle = () => {
+        if (!isCantoneseReading) return;
+        setTimeout(readContent, 400); // 標題與正文之間停頓 400ms
+    };
+
+    if (titleText) {
+        currentCancelFunction = speakCantoneseOnce(titleText, afterTitle);
+    } else {
+        afterTitle(); // 沒有標題就直接讀正文
+    }
+});
         }
 
         function readExplanationOnce() {
